@@ -9,7 +9,9 @@ private const val TAG = "RDKLaunch"
 class RDKLaunch : Activity(){
     override fun onStart() {
         super.onStart()
+        // todo: prompt for necessary permissions first
         startForegroundService(Intent(this, RDKForegroundService::class.java))
         Log.i(TAG, "started RDK service")
+        finishAndRemoveTask()
     }
 }
