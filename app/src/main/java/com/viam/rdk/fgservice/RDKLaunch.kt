@@ -9,7 +9,7 @@ private const val TAG = "RDKLaunch"
 class RDKLaunch : Activity(){
     override fun onStart() {
         super.onStart()
-        startService(Intent(this, RDKForegroundService::class.java))
+        startForegroundService(Intent(this, RDKForegroundService::class.java))
         Log.i(TAG, "started RDK service")
     }
 }

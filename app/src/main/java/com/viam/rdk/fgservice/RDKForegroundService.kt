@@ -1,7 +1,13 @@
 package com.viam.rdk.fgservice
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Binder
 import android.os.Environment
 import android.os.IBinder
 import android.util.Log
@@ -13,6 +19,7 @@ import kotlin.io.path.Path
 private const val TAG = "RDKForegroundService"
 // todo: use app's filesDir instead of this
 private val CONFIG_DIR = Environment.getExternalStorageDirectory().toPath().resolve("Download")
+private const val FOREGROUND_NOTIF_ID = 1
 
 class RDKThread : Thread() {
     // lateinit var filesDir: java.io.File
@@ -28,14 +35,30 @@ class RDKThread : Thread() {
             watcher.take()
         }
         Log.i(TAG, "found $path, starting")
-        mainEntry()
+        try {
+            mainEntry(path.toString())
+        } catch (e: Exception) {
+            Log.e(TAG, "viam thread caught error $e")
+        } finally {
+            Log.i(TAG, "finished viam thread")
+        }
     }
 }
 
+class RDKBinder : Binder() {}
+
 class RDKForegroundService : Service() {
     private final val thread = RDKThread()
-    override fun onBind(intent: Intent): IBinder? {
-        return null
+    override fun onBind(intent: Intent): IBinder {
+        return RDKBinder()
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        val chan = NotificationChannel("background", "background", NotificationManager.IMPORTANCE_HIGH)
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
+        val notif = Notification.Builder(this, chan.id).setContentTitle("Viam RDK").setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
+        this.startForeground(FOREGROUND_NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
