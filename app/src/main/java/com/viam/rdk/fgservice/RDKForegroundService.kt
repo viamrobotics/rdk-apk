@@ -14,7 +14,8 @@ import android.util.Log
 import droid.Droid.mainEntry
 import kotlin.io.path.exists
 import java.nio.file.StandardWatchEventKinds
-import kotlin.io.path.Path
+import android.net.ConnectivityManager
+import android.system.Os
 
 private const val TAG = "RDKForegroundService"
 // todo: use app's filesDir instead of this
@@ -22,7 +23,7 @@ private val CONFIG_DIR = Environment.getExternalStorageDirectory().toPath().reso
 private const val FOREGROUND_NOTIF_ID = 1
 
 class RDKThread : Thread() {
-    // lateinit var filesDir: java.io.File
+    lateinit var filesDir: java.io.File
     override fun run() {
         super.run()
         // val dirPath = filesDir.toPath()
@@ -36,7 +37,7 @@ class RDKThread : Thread() {
         }
         Log.i(TAG, "found $path, starting")
         try {
-            mainEntry(path.toString())
+            mainEntry(path.toString(), filesDir.toString())
         } catch (e: Exception) {
             Log.e(TAG, "viam thread caught error $e")
         } finally {
@@ -62,7 +63,7 @@ class RDKForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // thread.filesDir = filesDir
+        thread.filesDir = filesDir
         thread.start()
         return super.onStartCommand(intent, flags, startId)
     }
