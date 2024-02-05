@@ -11,7 +11,32 @@
 
 ## avd setup
 
-You need a rooted device to install modules. To set up your emulator:
+### setup with root
+
+Root is not strictly required but you may want it so you can write + inspect app private storage. If so:
 
 - in android studio device manager, create a new AVD. Pick an android 10 image for your laptop's architecture (x86 for intel, ARM for apple silicon probably). Make sure to pick one that **doesn't** have google play services. You'll probably have to switch tabs in the UI.
 - run `adb root`, `adb shell`, `su`, `whoami` to make sure you really can get root
+
+### setup without root
+
+We're targeting SDK 28 so we can execute downloaded files (see 'termux hack' section below).
+
+To set up local modules, copy binaries into /sdcard/Download like:
+
+```
+adb push binary-name /sdcard/Download
+```
+
+And set up your module to use /sdcard/Download/binary-name as the `executable_path`. Via an ugly and semi-reliable hack, the RDK will then copy from Download to its private cache directory before running.
+
+## termux hack
+
+Nutshell: newer android doesn't want to execute files you download. (They think this is a W^X violation, i.e. nobody other than the package manager should be able to write to a location that is then executed).
+
+We're copying termux, an android shell for linux. They target android sdk 28 to get the old behavior. This means we can't distribute via play store, which we're okay with.
+
+More links:
+- https://viam.atlassian.net/browse/RSDK-6558 for history of the issue for us
+- https://github.com/termux/termux-app/discussions/3372 for summary of termux approach
+- https://android.googlesource.com/platform/system/sepolicy/+/master/private/untrusted_app_27.te#24 droid selinux policy which controls this for SDK <= 28
