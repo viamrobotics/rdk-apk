@@ -63,7 +63,7 @@ class RDKForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        thread.filesDir = filesDir
+        thread.filesDir = cacheDir
         thread.start()
         return super.onStartCommand(intent, flags, startId)
     }
