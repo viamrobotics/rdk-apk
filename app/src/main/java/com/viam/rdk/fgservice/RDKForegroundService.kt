@@ -6,24 +6,53 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Environment
 import android.os.IBinder
 import android.util.Log
 import droid.Droid.mainEntry
-import kotlin.io.path.exists
 import java.nio.file.StandardWatchEventKinds
-import android.net.ConnectivityManager
-import android.system.Os
+import kotlin.io.path.exists
+
 
 private const val TAG = "RDKForegroundService"
 // todo: use app's filesDir instead of this
 private val CONFIG_DIR = Environment.getExternalStorageDirectory().toPath().resolve("Download")
 private const val FOREGROUND_NOTIF_ID = 1
 
-class RDKThread : Thread() {
+/** returns list of missing perms. empty means all granted */
+fun missingPerms(context: Context, perms: Array<String>): Array<String> {
+    return perms.filter(fun (perm: String): Boolean {
+        return context.packageManager.checkPermission(perm, context.packageName) == PackageManager.PERMISSION_DENIED
+    }).toTypedArray()
+}
+
+class RDKThread() : Thread() {
     lateinit var filesDir: java.io.File
+    lateinit var context: Context
+
+    /** wait for necessary permissions to be granted */
+    fun permissionLoop() {
+        val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
+        val perms = info.requestedPermissions
+        var counter = 0
+        while (true) {
+            val missing = missingPerms(context, perms)
+            if (missing.isEmpty()) {
+                Log.i(TAG, "All permissions granted, starting")
+                break
+            }
+            if (counter % 10 == 0) {
+                Log.i(TAG, "Some permissions are missing, waiting to start: ${missing.joinToString()}")
+            }
+            counter += 1
+            sleep(1000)
+        }
+    }
+
     override fun run() {
         super.run()
         // val dirPath = filesDir.toPath()
@@ -35,7 +64,8 @@ class RDKThread : Thread() {
             dirPath.register(watcher, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
             watcher.take()
         }
-        Log.i(TAG, "found $path, starting")
+        Log.i(TAG, "found $path, proceeding")
+        permissionLoop()
         try {
             mainEntry(path.toString(), filesDir.toString())
         } catch (e: Exception) {
@@ -64,6 +94,7 @@ class RDKForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         thread.filesDir = cacheDir
+        thread.context = applicationContext
         thread.start()
         return super.onStartCommand(intent, flags, startId)
     }
