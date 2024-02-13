@@ -32,7 +32,7 @@ And set up your module to use /sdcard/Download/binary-name as the `executable_pa
 
 ## termux hack
 
-Nutshell: newer android doesn't want to execute files you download. (They think this is a W^X violation, i.e. nobody other than the package manager should be able to write to a location that is then executed).
+Nutshell: newer android doesn't want to execute files you download. ([They think](https://developer.android.com/about/versions/10/behavior-changes-10#execute-permission) this is a W^X violation, i.e. nobody other than the package manager should be able to write to a location that is then executed).
 
 We're copying termux, an android shell for linux. They target android sdk 28 to get the old behavior. This means we can't distribute via play store, which we're okay with.
 

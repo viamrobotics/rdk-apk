@@ -55,7 +55,7 @@ class RDKThread() : Thread() {
 
     override fun run() {
         super.run()
-        // val dirPath = filesDir.toPath()
+        permissionLoop()
         val dirPath = CONFIG_DIR
         val path = dirPath.resolve("viam.json")
         while (!path.exists()) {
@@ -64,8 +64,7 @@ class RDKThread() : Thread() {
             dirPath.register(watcher, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
             watcher.take()
         }
-        Log.i(TAG, "found $path, proceeding")
-        permissionLoop()
+        Log.i(TAG, "found $path")
         try {
             mainEntry(path.toString(), filesDir.toString())
         } catch (e: Exception) {
