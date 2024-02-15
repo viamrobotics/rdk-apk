@@ -6,6 +6,7 @@ import android.util.Log
 
 private const val TAG = "RDKLaunch"
 
+// todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : Activity(){
     override fun onStart() {
         super.onStart()
