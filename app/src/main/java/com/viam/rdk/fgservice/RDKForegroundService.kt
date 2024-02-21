@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
@@ -58,12 +57,13 @@ class RDKThread() : Thread() {
         permissionLoop()
         val dirPath = CONFIG_DIR
         val path = dirPath.resolve("viam.json")
+        val watcher = dirPath.fileSystem.newWatchService()
         while (!path.exists()) {
             Log.i(TAG, "waiting for viam.json at $path")
-            val watcher = dirPath.fileSystem.newWatchService()
             dirPath.register(watcher, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
             watcher.take()
         }
+        watcher.close()
         Log.i(TAG, "found $path")
         try {
             mainEntry(path.toString(), filesDir.toString())
