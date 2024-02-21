@@ -1,5 +1,7 @@
 # foreground service demo
 
+![get it on paxstore](paxstore.img)
+
 ## instructions
 
 1. install android studio
