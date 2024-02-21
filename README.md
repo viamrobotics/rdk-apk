@@ -1,6 +1,6 @@
 # foreground service demo
 
-![get it on paxstore](./paxstore.img)
+![get it on paxstore](./paxstore.png)
 
 ## instructions
 
