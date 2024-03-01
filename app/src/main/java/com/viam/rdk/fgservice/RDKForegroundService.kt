@@ -87,8 +87,8 @@ class RDKForegroundService : Service() {
         super.onCreate()
         val chan = NotificationChannel("background", "background", NotificationManager.IMPORTANCE_HIGH)
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
-        val notif = Notification.Builder(this, chan.id).setContentTitle("Viam RDK").setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
-        this.startForeground(FOREGROUND_NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)
+        val notif = Notification.Builder(this, chan.id).setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
+        this.startForeground(FOREGROUND_NOTIF_ID, notif)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

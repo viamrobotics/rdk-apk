@@ -1,11 +1,8 @@
 package com.viam.rdk.fgservice
 
-import android.content.ContentResolver
-import android.content.ContentUris
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
-import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.util.Log
@@ -22,7 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,15 +42,39 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
+
+fun serviceRunning(ctx: Context): Boolean {
+    val manager = ctx.getSystemService(ComponentActivity.ACTIVITY_SERVICE) as ActivityManager
+    for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+        if (RDKForegroundService::class.java.name == service.service.className) {
+            return true
+        }
+    }
+    return false
+}
+
+fun maybeStart(ctx: Context) {
+    if (!serviceRunning(ctx)) {
+        ctx.startService(Intent(ctx, RDKForegroundService::class.java))
+        Log.i(TAG, "started RDK service")
+    } else {
+        Log.i(TAG, "not starting service, already running")
+    }
+}
+
+fun maybeStop(ctx: Context) {
+    if (serviceRunning(ctx)) {
+        ctx.stopService(Intent(ctx, RDKForegroundService::class.java))
+    } else {
+        Log.i(TAG, "not stopping service, already down")
+    }
+}
 
 // todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : ComponentActivity(){
@@ -61,11 +83,9 @@ class RDKLaunch : ComponentActivity(){
 
     override fun onStart() {
         super.onStart()
-        // donotcommit -- restore startService
-//        startService(Intent(this, RDKForegroundService::class.java))
-        Log.i(TAG, "started RDK service")
+        maybeStart(this)
         setContent {
-            MyScaffold(this::openFile, this::setPastedConfig, confPath)
+            MyScaffold(this::openFile, this::setPastedConfig, confPath, this)
         }
     }
 
@@ -136,7 +156,7 @@ class RDKLaunch : ComponentActivity(){
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: MutableState<String>) {
+fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: MutableState<String>, ctx: Context) {
     var value by rememberSaveable() {
         mutableStateOf("")
     }
@@ -147,8 +167,11 @@ fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: Mu
                 title = { Text("Viam RDK") },
                 actions = {
                     // todo: confirmation dialog for restart button
-                    IconButton(onClick = { /*TODO*/ }) {
-                        Icon(Icons.Outlined.Refresh, "Restart")
+                    IconButton(onClick = { maybeStart(ctx) }) {
+                        Icon(Icons.Outlined.PlayArrow, "Start")
+                    }
+                    IconButton(onClick = { maybeStop(ctx) }) {
+                        Icon(Icons.Outlined.Clear, "Stop")
                     }
                 },
             )
