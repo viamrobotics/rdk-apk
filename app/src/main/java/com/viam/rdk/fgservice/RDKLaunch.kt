@@ -52,27 +52,46 @@ import java.nio.charset.StandardCharsets
 
 
 private const val TAG = "RDKLaunch"
-const val defaultConfPath = "/sdcard/Download/viam.json"
+val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
 
 // todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : ComponentActivity(){
+    // todo: persist this please
     val confPath = mutableStateOf(defaultConfPath)
+
     override fun onStart() {
         super.onStart()
         // donotcommit -- restore startService
 //        startService(Intent(this, RDKForegroundService::class.java))
         Log.i(TAG, "started RDK service")
         setContent {
-            MyScaffold(this::openFile, confPath)
+            MyScaffold(this::openFile, this::setPastedConfig, confPath)
         }
     }
 
+    // send open_document intent which we catch in onActivityResult + write to a json config
     fun openFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "application/json"
         }
         startActivityForResult(intent, 2)
+    }
+
+    // write passed value to a json config
+    fun setPastedConfig(value: String) {
+        var output: FileOutputStream? = null
+        try {
+            val path = filesDir.resolve("pasted.viam.json")
+            output = FileOutputStream(path)
+            output.write(value.encodeToByteArray())
+            output.flush()
+            confPath.value = path.toString()
+            // todo: signal bg service
+            Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
+        } finally {
+            output?.close()
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -92,7 +111,7 @@ class RDKLaunch : ComponentActivity(){
                         val stream = FileInputStream(fd.fileDescriptor)
                         // note: we'll OOM if this file is huge
                         val buf = ByteArray(5000)
-                        val path = this.filesDir.resolve("loaded.viam.json")
+                        val path = filesDir.resolve("loaded.viam.json")
                         output = FileOutputStream(path)
                         var nbytes = stream.read(buf)
                         while (nbytes > -1) {
@@ -117,7 +136,7 @@ class RDKLaunch : ComponentActivity(){
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyScaffold(openFile: ()->Unit, confPath: MutableState<String>) {
+fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: MutableState<String>) {
     var value by rememberSaveable() {
         mutableStateOf("")
     }
@@ -160,7 +179,7 @@ fun MyScaffold(openFile: ()->Unit, confPath: MutableState<String>) {
                 .border(1.dp, Color.Black)
                 .fillMaxWidth(),
         )
-        Button(onClick = { /*TODO*/ }) {
+        Button(onClick = { setPastedConfig(value) }) {
             Text("Apply config")
         }
     }
