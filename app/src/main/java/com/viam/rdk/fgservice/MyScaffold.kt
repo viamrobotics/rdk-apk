@@ -21,7 +21,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,7 +33,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: MutableState<String>, ctx: Context) {
+fun MyScaffold(activity: RDKLaunch) {
     var value by rememberSaveable() {
         mutableStateOf("")
     }
@@ -45,10 +44,10 @@ fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: Mu
                 title = { Text("Viam RDK") },
                 actions = {
                     // todo: confirmation dialog for restart button
-                    IconButton(onClick = { maybeStart(ctx) }) {
+                    IconButton(onClick = { maybeStart(activity) }) {
                         Icon(Icons.Outlined.PlayArrow, "Start")
                     }
-                    IconButton(onClick = { maybeStop(ctx) }) {
+                    IconButton(onClick = { maybeStop(activity) }) {
                         Icon(Icons.Outlined.Clear, "Stop")
                     }
                 },
@@ -60,12 +59,12 @@ fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: Mu
         .padding(PaddingValues(horizontal = 10.dp))) {
         PermissionsCard()
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
-        Text(confPath.value)
+        Text(activity.confPath.value)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = openFile) {
+            Button(onClick = activity::openFile) {
                 Text("Load viam.json")
             }
-            Button(onClick = { confPath.value = defaultConfPath }){
+            Button(onClick = { activity.savePref(defaultConfPath) }){
                 Text("Default viam.json")
             }
         }
@@ -80,7 +79,7 @@ fun MyScaffold(openFile: ()->Unit, setPastedConfig: (String)->Unit, confPath: Mu
                 .border(1.dp, Color.Black)
                 .fillMaxWidth(),
         )
-        Button(onClick = { setPastedConfig(value) }) {
+        Button(onClick = { activity.setPastedConfig(value) }) {
             Text("Apply config")
         }
     }

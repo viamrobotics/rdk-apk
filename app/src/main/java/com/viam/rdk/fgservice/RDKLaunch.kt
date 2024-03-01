@@ -4,12 +4,14 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Environment
+import android.preference.PreferenceManager
 import android.provider.DocumentsContract
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
+import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
@@ -50,9 +52,10 @@ class RDKLaunch : ComponentActivity(){
 
     override fun onStart() {
         super.onStart()
+        confPath.value = PreferenceManager.getDefaultSharedPreferences(this).getString("confPath", defaultConfPath) ?: defaultConfPath
         maybeStart(this)
         setContent {
-            MyScaffold(this::openFile, this::setPastedConfig, confPath, this)
+            MyScaffold(this)
         }
     }
 
@@ -73,12 +76,20 @@ class RDKLaunch : ComponentActivity(){
             output = FileOutputStream(path)
             output.write(value.encodeToByteArray())
             output.flush()
-            confPath.value = path.toString()
+            savePref(path.toString())
             // todo: signal bg service
             Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
         } finally {
             output?.close()
         }
+    }
+
+    // save path to shared preferences. used for persistence + to communicate w/ service
+    fun savePref(value: String) {
+        confPath.value = value
+        val editor = PreferenceManager.getDefaultSharedPreferences(this).edit()
+        editor.putString("confPath", value)
+        editor.apply()
     }
 
     @Deprecated("Deprecated in Java")
@@ -90,33 +101,40 @@ class RDKLaunch : ComponentActivity(){
             if (DocumentsContract.isDocumentUri(this, uri)) {
                 Log.i(TAG,"opening URI $uri")
                 val fd = contentResolver.openFileDescriptor(uri, "r")
-                var output: FileOutputStream? = null
                 try {
                     if (fd == null) {
                         Toast.makeText(this, "fd is null", Toast.LENGTH_SHORT).show()
                     } else {
                         val stream = FileInputStream(fd.fileDescriptor)
-                        // note: we'll OOM if this file is huge
-                        val buf = ByteArray(5000)
                         val path = filesDir.resolve("loaded.viam.json")
-                        output = FileOutputStream(path)
-                        var nbytes = stream.read(buf)
-                        while (nbytes > -1) {
-                            output.write(buf, 0, nbytes)
-                            nbytes = stream.read(buf)
-                        }
-                        output.flush()
-                        confPath.value = path.toString()
+                        copyStream(stream, path)
+                        savePref(path.toString())
                         // todo: signal bg service
                         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
                     }
                 } finally {
                     fd?.close()
-                    output?.close()
                 }
             } else {
                 Toast.makeText(this, "not a document URI", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+}
+
+// copy opened input stream to target path
+fun copyStream(stream: FileInputStream, dest: File) {
+    val buf = ByteArray(5000)
+    var output: FileOutputStream? = null
+    try {
+        output = FileOutputStream(dest)
+        var nbytes = stream.read(buf)
+        while (nbytes > -1) {
+            output.write(buf, 0, nbytes)
+            nbytes = stream.read(buf)
+        }
+        output.flush()
+    } finally {
+        output?.close()
     }
 }

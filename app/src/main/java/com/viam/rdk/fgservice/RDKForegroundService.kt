@@ -11,15 +11,15 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Environment
 import android.os.IBinder
+import android.preference.PreferenceManager
 import android.util.Log
 import droid.Droid.mainEntry
+import java.io.File
 import java.nio.file.StandardWatchEventKinds
 import kotlin.io.path.exists
 
 
 private const val TAG = "RDKForegroundService"
-// todo: use app's filesDir instead of this
-private val CONFIG_DIR = Environment.getExternalStorageDirectory().toPath().resolve("Download")
 private const val FOREGROUND_NOTIF_ID = 1
 
 /** returns list of missing perms. empty means all granted */
@@ -32,6 +32,7 @@ fun missingPerms(context: Context, perms: Array<String>): Array<String> {
 class RDKThread() : Thread() {
     lateinit var filesDir: java.io.File
     lateinit var context: Context
+    lateinit var confPath: String
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -55,8 +56,12 @@ class RDKThread() : Thread() {
     override fun run() {
         super.run()
         permissionLoop()
-        val dirPath = CONFIG_DIR
-        val path = dirPath.resolve("viam.json")
+        val path = File(confPath)
+        val dirPath = path.parentFile?.toPath()
+        if (dirPath == null) {
+            Log.i(TAG, "confPath $confPath parentFile is null")
+            return
+        }
         val watcher = dirPath.fileSystem.newWatchService()
         while (!path.exists()) {
             Log.i(TAG, "waiting for viam.json at $path")
@@ -94,6 +99,8 @@ class RDKForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         thread.filesDir = cacheDir
         thread.context = applicationContext
+        thread.confPath = PreferenceManager.getDefaultSharedPreferences(applicationContext).getString("confPath", defaultConfPath) ?: defaultConfPath
+        Log.i(TAG, "got confPath ${thread.confPath}")
         thread.start()
         return super.onStartCommand(intent, flags, startId)
     }
