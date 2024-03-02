@@ -71,7 +71,7 @@ fun MyScaffold(activity: RDKLaunch) {
         .padding(PaddingValues(horizontal = 10.dp))
         .verticalScroll(rememberScrollState())
             ) {
-        PermissionsCard()
+        PermissionsCard(activity)
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
         Text(activity.confPath.value)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

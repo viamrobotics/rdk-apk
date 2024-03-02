@@ -3,6 +3,8 @@ package com.viam.rdk.fgservice
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.PermissionInfo
 import android.os.Environment
 import android.preference.PreferenceManager
 import android.provider.DocumentsContract
@@ -10,6 +12,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import java.io.File
 import java.io.FileInputStream
@@ -49,10 +52,12 @@ fun maybeStop(ctx: Context) {
 class RDKLaunch : ComponentActivity(){
     // todo: persist this please
     val confPath = mutableStateOf(defaultConfPath)
+    val perms = mutableStateOf(mapOf<String, Boolean>())
 
     override fun onStart() {
         super.onStart()
         confPath.value = PreferenceManager.getDefaultSharedPreferences(this).getString("confPath", defaultConfPath) ?: defaultConfPath
+        refreshPermissions()
         maybeStart(this)
         setContent {
             MyScaffold(this)
@@ -121,6 +126,20 @@ class RDKLaunch : ComponentActivity(){
                 Toast.makeText(this, "not a document URI", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // reload observable permission state
+    fun refreshPermissions() {
+        val info = packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+        val rperms = info.requestedPermissions
+        val map = mutableMapOf<String, Boolean>()
+        for (perm in rperms) {
+            val pInfo = packageManager.getPermissionInfo(perm, 0)
+            if (pInfo.protection == PermissionInfo.PROTECTION_DANGEROUS) {
+                map[perm] = packageManager.checkPermission(perm, packageName) != PackageManager.PERMISSION_DENIED
+            }
+        }
+        perms.value = map
     }
 }
 
