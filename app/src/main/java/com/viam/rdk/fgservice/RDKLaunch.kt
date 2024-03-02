@@ -70,18 +70,20 @@ class RDKLaunch : ComponentActivity(){
 
     // write passed value to a json config
     fun setPastedConfig(value: String) {
-        var output: FileOutputStream? = null
-        try {
-            val path = filesDir.resolve("pasted.viam.json")
-            output = FileOutputStream(path)
-            output.write(value.encodeToByteArray())
-            output.flush()
-            savePref(path.toString())
-            // todo: signal bg service
-            Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
-        } finally {
-            output?.close()
-        }
+        val path = filesDir.resolve("pasted.viam.json")
+        writeString(value, path)
+        savePref(path.toString())
+        // todo: signal bg service
+        Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
+    }
+
+    fun setIdKeyConfig(id: String, key: String) {
+        val fullJson = """{"cloud":{"app_address":"https://app.viam.com:443","id":"$id","secret":"$key"}}"""
+        val path = filesDir.resolve("id-secret.viam.json")
+        writeString(fullJson, path)
+        savePref(path.toString())
+        // todo: signal bg service
+        Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
     }
 
     // save path to shared preferences. used for persistence + to communicate w/ service
@@ -133,6 +135,17 @@ fun copyStream(stream: FileInputStream, dest: File) {
             output.write(buf, 0, nbytes)
             nbytes = stream.read(buf)
         }
+        output.flush()
+    } finally {
+        output?.close()
+    }
+}
+
+fun writeString(value: String, path: File) {
+    var output: FileOutputStream? = null
+    try {
+        output = FileOutputStream(path)
+        output.write(value.encodeToByteArray())
         output.flush()
     } finally {
         output?.close()

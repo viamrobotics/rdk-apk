@@ -1,6 +1,5 @@
 package com.viam.rdk.fgservice
 
-import android.content.Context
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,9 +33,17 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyScaffold(activity: RDKLaunch) {
-    var value by rememberSaveable() {
+    var fullJson by rememberSaveable() {
         mutableStateOf("")
     }
+    var idValue by rememberSaveable() {
+        mutableStateOf("")
+    }
+    var secretValue by rememberSaveable() {
+        mutableStateOf("")
+    }
+    val mono = TextStyle.Default.copy(fontFamily = FontFamily.Monospace)
+    val textMod = Modifier.border(1.dp, Color.Black).fillMaxWidth().padding(5.dp)
 
     Scaffold(
         topBar = {
@@ -69,18 +76,35 @@ fun MyScaffold(activity: RDKLaunch) {
             }
         }
 
-        Text("Paste config", style=MaterialTheme.typography.titleMedium)
+        Text("ID and secret", style=MaterialTheme.typography.titleMedium)
+        Text("ID", style=MaterialTheme.typography.titleSmall)
+        BasicTextField(value = idValue, onValueChange = {idValue = it}, textStyle=mono, modifier = textMod)
+        Text("secret", style=MaterialTheme.typography.titleSmall)
+        BasicTextField(value = secretValue, onValueChange = {secretValue=it}, textStyle=mono, modifier = textMod)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = { activity.setIdKeyConfig(idValue, secretValue) }) {
+                Text("Apply key + secret")
+            }
+            Button(onClick = { idValue = ""; secretValue = "" }) {
+                Text("Clear")
+            }
+        }
+
+        Text("Paste full json", style=MaterialTheme.typography.titleMedium)
         BasicTextField(
-            value=value,
-            onValueChange={value = it},
-            textStyle = TextStyle.Default.copy(fontFamily = FontFamily.Monospace),
+            value=fullJson,
+            onValueChange={fullJson = it},
+            textStyle = mono,
             minLines = 3,
-            modifier = Modifier
-                .border(1.dp, Color.Black)
-                .fillMaxWidth(),
+            modifier = textMod,
         )
-        Button(onClick = { activity.setPastedConfig(value) }) {
-            Text("Apply config")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Button(onClick = { activity.setPastedConfig(fullJson) }) {
+                Text("Apply pasted config")
+            }
+            Button(onClick = { fullJson = "" }) {
+                Text("Clear")
+            }
         }
     }
     }
