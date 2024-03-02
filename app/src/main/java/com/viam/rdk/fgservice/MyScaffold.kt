@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -43,7 +45,10 @@ fun MyScaffold(activity: RDKLaunch) {
         mutableStateOf("")
     }
     val mono = TextStyle.Default.copy(fontFamily = FontFamily.Monospace)
-    val textMod = Modifier.border(1.dp, Color.Black).fillMaxWidth().padding(5.dp)
+    val textMod = Modifier
+        .border(1.dp, Color.Black)
+        .fillMaxWidth()
+        .padding(5.dp)
 
     Scaffold(
         topBar = {
@@ -63,7 +68,9 @@ fun MyScaffold(activity: RDKLaunch) {
     ) {
             padding -> Column(modifier = Modifier
         .padding(padding)
-        .padding(PaddingValues(horizontal = 10.dp))) {
+        .padding(PaddingValues(horizontal = 10.dp))
+        .verticalScroll(rememberScrollState())
+            ) {
         PermissionsCard()
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
         Text(activity.confPath.value)
