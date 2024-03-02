@@ -13,6 +13,7 @@ import android.os.Environment
 import android.os.IBinder
 import android.preference.PreferenceManager
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import droid.Droid.mainEntry
 import java.io.File
 import java.nio.file.StandardWatchEventKinds
@@ -33,6 +34,7 @@ class RDKThread() : Thread() {
     lateinit var filesDir: java.io.File
     lateinit var context: Context
     lateinit var confPath: String
+    var waitPerms: Boolean = true
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -55,7 +57,11 @@ class RDKThread() : Thread() {
 
     override fun run() {
         super.run()
-        permissionLoop()
+        if (waitPerms) {
+            permissionLoop()
+        } else {
+            Log.i(TAG, "waitPerms = false, skipping permissionLoop")
+        }
         val path = File(confPath)
         val dirPath = path.parentFile?.toPath()
         if (dirPath == null) {
@@ -99,7 +105,9 @@ class RDKForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         thread.filesDir = cacheDir
         thread.context = applicationContext
-        thread.confPath = PreferenceManager.getDefaultSharedPreferences(applicationContext).getString("confPath", defaultConfPath) ?: defaultConfPath
+        val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        thread.confPath = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
+        thread.waitPerms = prefs.getBoolean("waitPerms", true)
         Log.i(TAG, "got confPath ${thread.confPath}")
         thread.start()
         return super.onStartCommand(intent, flags, startId)
