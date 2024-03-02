@@ -11,15 +11,17 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Environment
 import android.os.IBinder
+import android.preference.PreferenceManager
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import droid.Droid.mainEntry
+import droid.Droid.droidStopHook
+import java.io.File
 import java.nio.file.StandardWatchEventKinds
 import kotlin.io.path.exists
 
 
 private const val TAG = "RDKForegroundService"
-// todo: use app's filesDir instead of this
-private val CONFIG_DIR = Environment.getExternalStorageDirectory().toPath().resolve("Download")
 private const val FOREGROUND_NOTIF_ID = 1
 
 /** returns list of missing perms. empty means all granted */
@@ -32,6 +34,8 @@ fun missingPerms(context: Context, perms: Array<String>): Array<String> {
 class RDKThread() : Thread() {
     lateinit var filesDir: java.io.File
     lateinit var context: Context
+    lateinit var confPath: String
+    var waitPerms: Boolean = true
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -54,9 +58,17 @@ class RDKThread() : Thread() {
 
     override fun run() {
         super.run()
-        permissionLoop()
-        val dirPath = CONFIG_DIR
-        val path = dirPath.resolve("viam.json")
+        if (waitPerms) {
+            permissionLoop()
+        } else {
+            Log.i(TAG, "waitPerms = false, skipping permissionLoop")
+        }
+        val path = File(confPath)
+        val dirPath = path.parentFile?.toPath()
+        if (dirPath == null) {
+            Log.i(TAG, "confPath $confPath parentFile is null")
+            return
+        }
         val watcher = dirPath.fileSystem.newWatchService()
         while (!path.exists()) {
             Log.i(TAG, "waiting for viam.json at $path")
@@ -87,13 +99,17 @@ class RDKForegroundService : Service() {
         super.onCreate()
         val chan = NotificationChannel("background", "background", NotificationManager.IMPORTANCE_HIGH)
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
-        val notif = Notification.Builder(this, chan.id).setContentTitle("Viam RDK").setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
-        this.startForeground(FOREGROUND_NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST)
+        val notif = Notification.Builder(this, chan.id).setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
+        this.startForeground(FOREGROUND_NOTIF_ID, notif)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         thread.filesDir = cacheDir
         thread.context = applicationContext
+        val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        thread.confPath = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
+        thread.waitPerms = prefs.getBoolean("waitPerms", true)
+        Log.i(TAG, "got confPath ${thread.confPath}")
         thread.start()
         return super.onStartCommand(intent, flags, startId)
     }
@@ -101,5 +117,6 @@ class RDKForegroundService : Service() {
     override fun onDestroy() {
         // todo: figure out how to stop thread -- need to send exit command to RDK via exported API
         super.onDestroy()
+        droidStopHook()
     }
 }
