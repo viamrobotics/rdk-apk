@@ -15,6 +15,7 @@ import android.preference.PreferenceManager
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import droid.Droid.mainEntry
+import droid.Droid.droidStopHook
 import java.io.File
 import java.nio.file.StandardWatchEventKinds
 import kotlin.io.path.exists
@@ -116,5 +117,6 @@ class RDKForegroundService : Service() {
     override fun onDestroy() {
         // todo: figure out how to stop thread -- need to send exit command to RDK via exported API
         super.onDestroy()
+        droidStopHook()
     }
 }
