@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
@@ -72,6 +74,9 @@ fun MyScaffold(activity: RDKLaunch) {
         .verticalScroll(rememberScrollState())
             ) {
         PermissionsCard(activity)
+
+        Spacer(Modifier.height(20.dp))
+
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
         Text(activity.confPath.value)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -82,6 +87,8 @@ fun MyScaffold(activity: RDKLaunch) {
                 Text("Default viam.json")
             }
         }
+
+        Spacer(Modifier.height(20.dp))
 
         Text("ID and secret", style=MaterialTheme.typography.titleMedium)
         Text("ID", style=MaterialTheme.typography.titleSmall)
@@ -96,6 +103,8 @@ fun MyScaffold(activity: RDKLaunch) {
                 Text("Clear")
             }
         }
+
+        Spacer(Modifier.height(20.dp))
 
         Text("Paste full json", style=MaterialTheme.typography.titleMedium)
         BasicTextField(
