@@ -1,0 +1,18 @@
+# build a docker image with android build tooling
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        default: ghcr.io/viam-labs/rdk-apk
+      tag:
+        default: latest
+
+jobs:
+  base-image:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: docker build -t ${{ inputs.image }}:${{ inputs.tag }} .
+    - name: push
+      run: docker push -t ${{ inputs.image }}:${{ inputs.tag }}
