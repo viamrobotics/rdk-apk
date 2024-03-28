@@ -10,6 +10,8 @@ on:
 jobs:
   base-image:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
     - uses: actions/checkout@v4
     - name: build
