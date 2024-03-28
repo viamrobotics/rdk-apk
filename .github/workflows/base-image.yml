@@ -13,6 +13,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: build
-      run: docker build -t ${{ inputs.image }}:${{ inputs.tag }} .
+      run: docker build -t ${{ inputs.image }}:${{ inputs.tag }} --label org.label-schema.vcs-ref=$(git rev-parse HEAD) .
     - name: push
-      run: docker push -t ${{ inputs.image }}:${{ inputs.tag }}
+      run: docker push ${{ inputs.image }}:${{ inputs.tag }}
