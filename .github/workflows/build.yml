@@ -9,7 +9,7 @@ on:
 
 jobs:
   daily:
-    runs-on: ubuntu-large
+    runs-on: ubuntu-latest
     container: ghcr.io/viam-labs/rdk-apk
     steps:
     - uses: actions/checkout@v4
