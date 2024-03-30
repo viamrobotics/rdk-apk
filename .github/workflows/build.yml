@@ -10,7 +10,7 @@ on:
 jobs:
   daily:
     runs-on: buildjet-4vcpu-ubuntu-2204
-    container: ghcr.io/viam-labs/rdk-apk
+    container: ghcr.io/${{ github.repository }}
     steps:
     - uses: actions/checkout@v4
       with:
