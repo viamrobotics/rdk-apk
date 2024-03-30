@@ -22,12 +22,14 @@ jobs:
         path: rdk
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
+    - name: build x264
+      working-directory: rdk
+      run: |
+        make etc/android/prefix/aarch64
+        make etc/android/prefix/x86_64
     - name: build tflite
       working-directory: rdk
       run: ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
-    - name: build x264
-      working-directory: rdk
-      run: make etc/android/prefix/{aarch64,x86_64}
     - name: build AAR
       working-directory: rdk
       run: CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
