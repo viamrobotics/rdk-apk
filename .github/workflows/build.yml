@@ -1,0 +1,34 @@
+# build 
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        default: viamrobotics/rdk
+      ref:
+        default: main
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    container: ghcr.io/viam-labs/rdk-apk
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: rdk-apk
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.repository }}
+        ref: ${{ inputs.ref }}
+        path: rdk
+    - name: build AAR
+      run: |
+        cd rdk
+        ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
+        CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT \
+          make droid-rdk.aar
+    - name: build APK
+      run: |
+        export RDK_PATH=$(realpath rdk)
+        cd rdk-apk
+        ./gradlew assembleDebug
+        find | grep apk
