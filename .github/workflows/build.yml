@@ -37,10 +37,11 @@ jobs:
     # todo: pass down APK + RDK version information
     - name: build APK
       working-directory: rdk-apk
+      shell: bash
       run: |
         export RDK_PATH=$(realpath ../rdk)
+        source $SDKMAN_DIR/bin/sdkman-init.sh
         ./gradlew assembleDebug
-        find | grep apk
     - uses: actions/upload-artifact@v4
       with:
         path: rdk-apk/app/build/outputs/apk/debug/app-debug.apk
