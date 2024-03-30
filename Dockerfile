@@ -7,7 +7,7 @@ RUN --mount=type=cache,target=/var/cache/apt apt-get update
 # golang for rdk
 RUN --mount=type=cache,target=/var/cache/apt apt-get install -qy \
     zip \
-    openjdk-21-jre-headless \
+    openjdk-21-jdk-headless \
     make curl patch cmake git python3 \
     nasm \
     golang-1.21-go
