@@ -30,13 +30,18 @@ jobs:
     - name: build tflite
       working-directory: rdk
       run: ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
+    # todo: try setup-go instead of go in base image, for caching + simpler version upgrades
     - name: build AAR
       working-directory: rdk
       run: CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
-    # todo: pass down APK version information
+    # todo: pass down APK + RDK version information
     - name: build APK
       working-directory: rdk-apk
       run: |
         export RDK_PATH=$(realpath ../rdk)
         ./gradlew assembleDebug
         find | grep apk
+    - uses: actions/upload-artifact@v4
+      with:
+        path: rdk-apk/app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: error
