@@ -33,11 +33,15 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version: '1.21'
+        cache-dependency-path: rdk/go.sum
+    - name: gomobile
+      run: |
+        # todo: pin version in go.mod
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        gomobile init
     - name: build AAR
       working-directory: rdk
-      run: |
-        which go
-        CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
+      run: CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
     # todo: pass down APK + RDK version information
     - name: build APK
       working-directory: rdk-apk
@@ -47,7 +51,12 @@ jobs:
         source $SDKMAN_DIR/bin/sdkman-init.sh
         # todo(review): is it safe to use gradle in path instead of gradlew? or way to make gradlew use system gradle?
         gradle --no-daemon assembleDebug
+    - name: rename
+      run: |
+        mkdir dist
+        mv rdk-apk/app/build/outputs/apk/debug/app-debug.apk \
+          dist/rdk-$(date +%y%m%d)-$(cd rdk && git rev-parse --short HEAD)-$(cd rdk-apk && git rev-parse --short HEAD).apk
     - uses: actions/upload-artifact@v4
       with:
-        path: rdk-apk/app/build/outputs/apk/debug/app-debug.apk
+        path: dist
         if-no-files-found: error

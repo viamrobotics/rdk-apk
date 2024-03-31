@@ -4,13 +4,11 @@ FROM ubuntu:latest
 RUN --mount=type=cache,target=/var/cache/apt apt-get update
 # make...python3 for tflite build
 # nasm for x264
-# golang for rdk
 RUN --mount=type=cache,target=/var/cache/apt apt-get install -qy \
     zip \
     openjdk-21-jdk-headless \
     make curl patch cmake git python3 \
-    nasm \
-    golang-1.21-go
+    nasm
 
 ENV ANDROID_HOME /droid
 ENV ANDROID_SDK_ROOT /droid
@@ -31,9 +29,6 @@ RUN yes | sdkmanager --sdk_root=$(realpath .) --install "platforms;android-28" "
     && rm -rf emulator \
     && rm -rf tools/lib/monitor* \
     && rm -rf ${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/musl
-
-ENV PATH ${PATH}:/usr/lib/go-1.21/bin:/root/go/bin
-RUN go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init
 
 ENV SDKMAN_DIR /usr/local/sdkman
 # this is the sdk manager script from https://get.sdkman.io/
