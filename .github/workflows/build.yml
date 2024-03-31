@@ -39,6 +39,7 @@ jobs:
         # todo: pin version in go.mod
         go install golang.org/x/mobile/cmd/gomobile@latest
         gomobile init
+    # todo: per-platorm AAR so this is 2 x 100mb instead of 200mb
     - name: build AAR
       working-directory: rdk
       run: CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
