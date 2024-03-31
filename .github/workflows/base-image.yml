@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        default: ghcr.io/viam-labs/rdk-apk
+        default: ghcr.io/viamrobotics/rdk-apk
       tag:
         default: latest
 

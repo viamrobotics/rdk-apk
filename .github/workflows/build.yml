@@ -9,8 +9,8 @@ on:
 
 jobs:
   daily:
-    runs-on: buildjet-4vcpu-ubuntu-2204
-    container: ghcr.io/viam-labs/rdk-apk
+    runs-on: buildjet-8vcpu-ubuntu-2204
+    container: ghcr.io/${{ github.repository }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -22,19 +22,42 @@ jobs:
         path: rdk
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
+    - name: build x264
+      working-directory: rdk
+      run: |
+        make etc/android/prefix/aarch64
+        make etc/android/prefix/x86_64
     - name: build tflite
       working-directory: rdk
       run: ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
-    - name: build x264
-      working-directory: rdk
-      run: make etc/android/prefix/{aarch64,x86_64}
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+        cache-dependency-path: rdk/go.sum
+    - name: gomobile
+      run: |
+        # todo: pin version in go.mod
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        gomobile init
+    # todo: per-platorm AAR so this is 2 x 100mb instead of 200mb
     - name: build AAR
       working-directory: rdk
       run: CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
-    # todo: pass down APK version information
+    # todo: pass down APK + RDK version information
     - name: build APK
       working-directory: rdk-apk
+      shell: bash
       run: |
         export RDK_PATH=$(realpath ../rdk)
-        ./gradlew assembleDebug
-        find | grep apk
+        source $SDKMAN_DIR/bin/sdkman-init.sh
+        # todo(review): is it safe to use gradle in path instead of gradlew? or way to make gradlew use system gradle?
+        gradle --no-daemon assembleDebug
+    - name: rename
+      run: |
+        mkdir dist
+        mv rdk-apk/app/build/outputs/apk/debug/app-debug.apk \
+          dist/rdk-$(date +%y%m%d)-$(cd rdk && git rev-parse --short HEAD)-$(cd rdk-apk && git rev-parse --short HEAD).apk
+    - uses: actions/upload-artifact@v4
+      with:
+        path: dist
+        if-no-files-found: error
