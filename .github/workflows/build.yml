@@ -30,10 +30,14 @@ jobs:
     - name: build tflite
       working-directory: rdk
       run: ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
-    # todo: try setup-go instead of go in base image, for caching + simpler version upgrades
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
     - name: build AAR
       working-directory: rdk
-      run: CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
+      run: |
+        which go
+        CGO_CFLAGS="-I $HOME/tensorflow/tensorflow-2.12.0" PLATFORM_NDK_ROOT=$NDK_ROOT NDK_ROOT=$NDK_ROOT make droid-rdk.aar
     # todo: pass down APK + RDK version information
     - name: build APK
       working-directory: rdk-apk
@@ -41,6 +45,7 @@ jobs:
       run: |
         export RDK_PATH=$(realpath ../rdk)
         source $SDKMAN_DIR/bin/sdkman-init.sh
+        # todo(review): is it safe to use gradle in path instead of gradlew? or way to make gradlew use system gradle?
         gradle --no-daemon assembleDebug
     - uses: actions/upload-artifact@v4
       with:
