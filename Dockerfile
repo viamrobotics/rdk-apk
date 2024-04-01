@@ -37,3 +37,9 @@ ENV SDKMAN_DIR /usr/local/sdkman
 RUN --mount=type=bind,source=etc/get-sdkman.sh,target=get-sdkman.sh ./get-sdkman.sh
 # requires bash because it uses 'source' keyword internally
 RUN bash -c "source $SDKMAN_DIR/bin/sdkman-init.sh && sdk install gradle 8.2"
+
+# note: actions/setup-go fails at the jni step in a way I don't understand. apt getting for now.
+ENV PATH ${PATH}:/usr/lib/go-1.21/bin:/root/go/bin
+RUN --mount=type=cache,target=/var/cache/apt apt-get install -qy golang-1.21-go
+# todo: pin gomobile in rdk tools.go
+RUN go install golang.org/x/mobile/cmd/gomobile@latest && gomobile init

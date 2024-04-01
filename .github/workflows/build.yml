@@ -30,14 +30,6 @@ jobs:
     - name: build tflite
       working-directory: rdk
       run: ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
-    - uses: actions/setup-go@v5
-      with:
-        go-version: '1.21'
-    - name: gomobile
-      run: |
-        # todo: pin version in go.mod
-        go install golang.org/x/mobile/cmd/gomobile@latest
-        gomobile init
     # todo: per-platorm AAR so this is 2 x 100mb instead of 200mb
     - name: build AAR
       working-directory: rdk
