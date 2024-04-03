@@ -5,7 +5,9 @@
 1. install android studio
 2. open this project
 3. in the droid-apk branch of my RDK fork, [here](https://github.com/abe-winter/rdk/tree/droid-apk), run `make droid-rdk.aar`. you may need to install gomobile, you may need to be on go 1.19
-4. go to app/build.gradle.kts in this repo and find the implementation() line with droid-rdk.aar -- change it to the correct path on your system (or pass `RDK_PATH` environment variable to android studio)
+4. help this find your RDK. either:
+  - create a symlink /usr/local/src/rdk that points to your rdk
+  - or edit app/build.gradle.kts. change the droid-rdk.aar line to point to the correct path
 5. hamburger menu -> run -> run
 6. once the app is on your emulator AVD, go to its settings and grant all permissions
 
