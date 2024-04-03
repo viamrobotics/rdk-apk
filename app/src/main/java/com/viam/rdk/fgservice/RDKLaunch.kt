@@ -1,22 +1,30 @@
 package com.viam.rdk.fgservice
 
 import android.app.ActivityManager
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
+import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.PersistableBundle
 import android.preference.PreferenceManager
 import android.provider.DocumentsContract
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.Timer
+import java.util.TimerTask
+import com.jakewharton.processphoenix.ProcessPhoenix
+
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
@@ -41,8 +49,8 @@ fun maybeStart(ctx: Context) {
 }
 
 fun maybeStop(ctx: Context) {
-    if (serviceRunning(ctx)) {
-        ctx.stopService(Intent(ctx, RDKForegroundService::class.java))
+    if (singleton != null) {
+        singleton?.stopAndDestroy()
     } else {
         Log.i(TAG, "not stopping service, already down")
     }
@@ -53,12 +61,31 @@ class RDKLaunch : ComponentActivity(){
     // todo: persist this please
     val confPath = mutableStateOf(defaultConfPath)
     val perms = mutableStateOf(mapOf<String, Boolean>())
+    private lateinit var timer: Timer;
+    val bgState = mutableStateOf(RDKStatus.STOPPED)
+
+    inner class CheckService() : TimerTask() {
+        override fun run() {
+            val newVal = singleton?.thread?.status ?: RDKStatus.STOPPED
+            if (newVal != bgState.value) {
+                Log.i(TAG, "bgState transition ${bgState.value} -> $newVal")
+            }
+            bgState.value = newVal
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
+        super.onCreate(savedInstanceState, persistentState)
+        Log.i(TAG, "ONCREATE!!!")
+    }
 
     override fun onStart() {
         super.onStart()
         confPath.value = PreferenceManager.getDefaultSharedPreferences(this).getString("confPath", defaultConfPath) ?: defaultConfPath
         refreshPermissions()
         maybeStart(this)
+        timer = Timer()
+        timer.schedule(CheckService(), 1000, 1000)
         setContent {
             MyScaffold(this)
         }
@@ -80,6 +107,13 @@ class RDKLaunch : ComponentActivity(){
         savePref(path.toString())
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
+    }
+
+    // destroy the process and start it again afterwards. killProcess removes Activity + Service.
+    // necessary because we have no other way to clean up the RDK's in-memory state
+    // (and we don't want to use a subprocess bc android)
+    fun hardRestart() {
+        ProcessPhoenix.triggerRebirth(this);
     }
 
     fun setIdKeyConfig(id: String, key: String) {

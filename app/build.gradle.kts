@@ -53,7 +53,9 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.10.1")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.compose.runtime:runtime-livedata:1.6.4")
     implementation("com.google.android.material:material:1.9.0")
+    implementation("com.jakewharton:process-phoenix:3.0.0")
     implementation(files("${(System.getenv("RDK_PATH") ?: "").ifEmpty {"/usr/local/src/rdk"} }/droid-rdk.aar"))
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")

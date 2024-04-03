@@ -18,6 +18,8 @@ import droid.Droid.mainEntry
 import droid.Droid.droidStopHook
 import java.io.File
 import java.nio.file.StandardWatchEventKinds
+import java.util.Timer
+import java.util.TimerTask
 import kotlin.io.path.exists
 
 
@@ -31,11 +33,16 @@ fun missingPerms(context: Context, perms: Array<String>): Array<String> {
     }).toTypedArray()
 }
 
+enum class RDKStatus {
+    STOPPED, WAITING_TO_START, RUNNING, STOPPING
+}
+
 class RDKThread() : Thread() {
     lateinit var filesDir: java.io.File
     lateinit var context: Context
     lateinit var confPath: String
     var waitPerms: Boolean = true
+    var status: RDKStatus = RDKStatus.STOPPED
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -58,6 +65,7 @@ class RDKThread() : Thread() {
 
     override fun run() {
         super.run()
+        status = RDKStatus.WAITING_TO_START
         if (waitPerms) {
             permissionLoop()
         } else {
@@ -78,25 +86,31 @@ class RDKThread() : Thread() {
         watcher.close()
         Log.i(TAG, "found $path")
         try {
+            status = RDKStatus.RUNNING
             mainEntry(path.toString(), filesDir.toString())
         } catch (e: Exception) {
             Log.e(TAG, "viam thread caught error $e")
         } finally {
             Log.i(TAG, "finished viam thread")
         }
+        status = RDKStatus.STOPPED
     }
 }
 
 class RDKBinder : Binder() {}
 
+var singleton: RDKForegroundService? = null
+
 class RDKForegroundService : Service() {
-    private final val thread = RDKThread()
+    final val thread = RDKThread()
+
     override fun onBind(intent: Intent): IBinder {
         return RDKBinder()
     }
 
     override fun onCreate() {
         super.onCreate()
+        singleton = this
         val chan = NotificationChannel("background", "background", NotificationManager.IMPORTANCE_HIGH)
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
         val notif = Notification.Builder(this, chan.id).setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
@@ -114,9 +128,35 @@ class RDKForegroundService : Service() {
         return super.onStartCommand(intent, flags, startId)
     }
 
+    // if stopping, force stop. otherwise, just stop.
+    fun stopAndDestroy() {
+        // todo: state graph is a little wonky here around stopping while starting; it will stay in start loop I think
+        when (thread.status) {
+            RDKStatus.STOPPING -> {
+                // need to destroy the thread? but tricky -- the process will still have state
+                Log.i(TAG, "TODO FORCE STOP")
+            }
+            else -> {
+                thread.status = RDKStatus.STOPPING
+                droidStopHook()
+            }
+        }
+        Timer().schedule(StopTimer(), 0, 250)
+    }
+
+    inner class StopTimer : TimerTask() {
+        override fun run() {
+            if (thread.status == RDKStatus.STOPPED) {
+                Log.i(TAG, "StopTimer found STOPPED")
+                cancel()
+                stopSelf()
+            }
+        }
+    }
+
     override fun onDestroy() {
-        // todo: figure out how to stop thread -- need to send exit command to RDK via exported API
         super.onDestroy()
-        droidStopHook()
+        singleton = null
+        Log.i(TAG, "service destroyed")
     }
 }
