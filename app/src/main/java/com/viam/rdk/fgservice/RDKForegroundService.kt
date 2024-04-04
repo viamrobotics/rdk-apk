@@ -137,6 +137,7 @@ class RDKForegroundService : Service() {
         thread.filesDir = cacheDir
         thread.context = applicationContext
         val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        // todo: can just set these values directly, don't need to do through prefs
         thread.confPath = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
         thread.waitPerms = prefs.getBoolean("waitPerms", true)
         Log.i(TAG, "got confPath ${thread.confPath}")

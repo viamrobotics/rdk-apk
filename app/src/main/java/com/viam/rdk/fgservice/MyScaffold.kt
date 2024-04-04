@@ -113,15 +113,15 @@ fun MyScaffold(activity: RDKLaunch) {
 
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
         Text(activity.confPath.value)
-        Text("Using config ${jsonComment.value}", color = Color.Gray)
+        Text("Using config ${jsonComment.value}", color = Color.Gray, maxLines = 3)
         Spacer(Modifier.height(20.dp))
         TabLayout(listOf("Load json", "ID + secret", "Paste json")) {
             Column {
-                Button(onClick = { activity.savePref(defaultConfPath); jsonComment.value = jsonComments["default"] }){
+                Button(onClick = { activity.savePref(defaultConfPath); activity.setJsonComment(jsonComments["default"]!!) }){
                     Text("Use default /sdcard/Download/viam.json")
                 }
                 Button(onClick = activity::openFile) {
-                    Text("Load viam.json")
+                    Text("Browse for viam.json")
                 }
             }
 

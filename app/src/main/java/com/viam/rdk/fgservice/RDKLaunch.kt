@@ -1,36 +1,25 @@
 package com.viam.rdk.fgservice
 
 import android.app.ActivityManager
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
 import android.net.Uri
-import android.os.Bundle
 import android.os.Environment
-import android.os.Handler
-import android.os.PersistableBundle
 import android.preference.PreferenceManager
 import android.provider.DocumentsContract
-import android.provider.DocumentsProvider
-import android.provider.OpenableColumns
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
-import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Timer
 import java.util.TimerTask
 import com.jakewharton.processphoenix.ProcessPhoenix
-import java.net.URLDecoder
-import java.nio.charset.Charset
-
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
@@ -87,14 +76,11 @@ class RDKLaunch : ComponentActivity(){
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
-        super.onCreate(savedInstanceState, persistentState)
-        Log.i(TAG, "ONCREATE!!!")
-    }
-
     override fun onStart() {
         super.onStart()
-        confPath.value = PreferenceManager.getDefaultSharedPreferences(this).getString("confPath", defaultConfPath) ?: defaultConfPath
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        confPath.value = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
+        jsonComment.value = prefs.getString("jsonComment", jsonComment.value)
         refreshPermissions()
         maybeStart(this)
         timer = Timer()
@@ -102,6 +88,12 @@ class RDKLaunch : ComponentActivity(){
         setContent {
             MyScaffold(this)
         }
+    }
+
+    fun setJsonComment(value: String) {
+        jsonComment.value = value
+        val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        prefs.edit().putString("jsonComment", value).apply() // todo: is this blocking?
     }
 
     // send open_document intent which we catch in onActivityResult + write to a json config
@@ -119,7 +111,7 @@ class RDKLaunch : ComponentActivity(){
         val path = filesDir.resolve("pasted.viam.json")
         writeString(value, path)
         savePref(path.toString())
-        jsonComment.value = jsonComments["pasted"]
+        setJsonComment(jsonComments["pasted"]!!)
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
     }
@@ -136,7 +128,7 @@ class RDKLaunch : ComponentActivity(){
         val path = filesDir.resolve("id-secret.viam.json")
         writeString(fullJson, path)
         savePref(path.toString())
-        jsonComment.value = jsonComments["id-secret"]
+        setJsonComment(jsonComments["id-secret"]!!)
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
 
@@ -173,7 +165,7 @@ class RDKLaunch : ComponentActivity(){
                 } finally {
                     fd?.close()
                 }
-                jsonComment.value = "loaded from ${formatUri(uri)}"
+                setJsonComment("loaded from URI: ${formatUri(uri)}")
             } else {
                 Toast.makeText(this, "not a document URI", Toast.LENGTH_SHORT).show()
             }
@@ -223,6 +215,6 @@ fun writeString(value: String, path: File) {
     }
 }
 
-fun formatUri(uri: Uri): String? {
-    return uri.path?.split(":")?.last()
+fun formatUri(uri: Uri): String {
+    return "${uri.authority}${uri.path}"
 }
