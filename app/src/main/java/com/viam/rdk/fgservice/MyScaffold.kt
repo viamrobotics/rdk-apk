@@ -53,13 +53,13 @@ fun StateViewer(status: RDKStatus) {
     Row(horizontalArrangement = Arrangement.Start, modifier = Modifier
         .fillMaxWidth()
         .height(30.dp)) {
-        val emoji = when (status) {
+        when (status) {
             RDKStatus.STOPPING -> CircularProgressIndicator(modifier = Modifier
                 .height(20.dp)
                 .width(20.dp))
             RDKStatus.RUNNING -> Text("\uD83C\uDD99")
             RDKStatus.WAIT_PERMISSION -> Text("⏳\uD83D\uDD12")
-            RDKStatus.WAIT_CONFIG -> Text("⏳⚙")
+            RDKStatus.WAIT_CONFIG -> Text("⏳⚙\uFE0F")
             RDKStatus.STOPPED -> Text("\uD83D\uDED1")
             RDKStatus.UNSET -> Text("❓")
         }
@@ -113,6 +113,7 @@ fun MyScaffold(activity: RDKLaunch) {
 
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
         Text(activity.confPath.value)
+        Text("Using config ${jsonComment.value}", color = Color.Gray)
         Spacer(Modifier.height(20.dp))
         TabLayout(listOf("Load json", "ID + secret", "Paste json")) {
             Column {

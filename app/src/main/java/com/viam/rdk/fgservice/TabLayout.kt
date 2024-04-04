@@ -50,15 +50,17 @@ fun TabLayout(tabNames: List<String>, modifier: Modifier = Modifier, content: @C
     Layout(modifier = modifier, content = content) {measurables, constraints ->
         if (tabNames.size != measurables.size) {
             Log.w(TAG, "tabNames.size != measurables.size -- (${tabNames.size}, ${measurables.size})")
-        }
-        if (tabNames.isEmpty()) {
-            Log.w(TAG, "tabNames is empty, things will break")
-        }
-        Log.i(TAG, "tab layout ${measurables.size}, $constraints")
-        val selIndex = tabNames.indexOf(selectedTab.value ?: tabNames[0]) // yup can be -1 and explode
-        val placeable = measurables[selIndex].measure(constraints)
-        layout(constraints.maxWidth, placeable.height) {
-            placeable.placeRelative(0, 0)
+            layout(constraints.maxWidth, 0) {}
+        }  else if (tabNames.isEmpty()) {
+            Log.w(TAG, "tabNames is empty")
+            layout(constraints.maxWidth, 0) {}
+        } else {
+            Log.i(TAG, "tab layout ${measurables.size}, $constraints")
+            val selIndex = tabNames.indexOf(selectedTab.value ?: tabNames[0]) // yup can be -1 and explode
+            val placeable = measurables[selIndex].measure(constraints)
+            layout(constraints.maxWidth, placeable.height) {
+                placeable.placeRelative(0, 0)
+            }
         }
     }
 }

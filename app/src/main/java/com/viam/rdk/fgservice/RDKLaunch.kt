@@ -7,33 +7,38 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.PersistableBundle
 import android.preference.PreferenceManager
 import android.provider.DocumentsContract
+import android.provider.DocumentsProvider
+import android.provider.OpenableColumns
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Timer
 import java.util.TimerTask
 import com.jakewharton.processphoenix.ProcessPhoenix
+import java.net.URLDecoder
+import java.nio.charset.Charset
 
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
 val selectedTab = mutableStateOf<String?>(null)
 val jsonComments = mapOf(
-    "default" to "Default path in downloads",
-    "loaded" to "Loaded from disk",
-    "id-secret" to "From ID + secret",
-    "pasted" to "From pasted JSON",
+    "default" to "from default path in downloads",
+    "id-secret" to "from ID + secret",
+    "pasted" to "from pasted JSON",
 )
 val jsonComment = mutableStateOf(jsonComments["default"])
 
@@ -106,6 +111,7 @@ class RDKLaunch : ComponentActivity(){
             type = "application/json"
         }
         startActivityForResult(intent, 2)
+        // see onActivityResult for the continuation of this
     }
 
     // write passed value to a json config
@@ -113,6 +119,7 @@ class RDKLaunch : ComponentActivity(){
         val path = filesDir.resolve("pasted.viam.json")
         writeString(value, path)
         savePref(path.toString())
+        jsonComment.value = jsonComments["pasted"]
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
     }
@@ -129,11 +136,13 @@ class RDKLaunch : ComponentActivity(){
         val path = filesDir.resolve("id-secret.viam.json")
         writeString(fullJson, path)
         savePref(path.toString())
+        jsonComment.value = jsonComments["id-secret"]
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
+
     }
 
-    // save path to shared preferences. used for persistence + to communicate w/ service
+    // save viam.json path to shared preferences. used for persistence + to communicate w/ service
     fun savePref(value: String) {
         confPath.value = value
         val editor = PreferenceManager.getDefaultSharedPreferences(this).edit()
@@ -145,8 +154,8 @@ class RDKLaunch : ComponentActivity(){
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         Log.i(TAG, "activity result $requestCode $resultCode $data")
-        data?.data?.also {
-            uri -> Log.i(TAG, "uri is $uri")
+        data?.data?.also { uri ->
+            Log.i(TAG, "uri is $uri")
             if (DocumentsContract.isDocumentUri(this, uri)) {
                 Log.i(TAG,"opening URI $uri")
                 val fd = contentResolver.openFileDescriptor(uri, "r")
@@ -164,6 +173,7 @@ class RDKLaunch : ComponentActivity(){
                 } finally {
                     fd?.close()
                 }
+                jsonComment.value = "loaded from ${formatUri(uri)}"
             } else {
                 Toast.makeText(this, "not a document URI", Toast.LENGTH_SHORT).show()
             }
@@ -211,4 +221,8 @@ fun writeString(value: String, path: File) {
     } finally {
         output?.close()
     }
+}
+
+fun formatUri(uri: Uri): String? {
+    return uri.path?.split(":")?.last()
 }
