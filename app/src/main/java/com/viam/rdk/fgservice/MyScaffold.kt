@@ -2,10 +2,14 @@ package com.viam.rdk.fgservice
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,6 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Button
@@ -38,19 +45,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun StateViewer(status: RDKStatus) {
-    val widget = when (status) {
-        RDKStatus.STOPPING -> CircularProgressIndicator()
-        RDKStatus.RUNNING -> Icon(Icons.Default.ArrowForward, "Running")
-        RDKStatus.WAITING_TO_START -> Icon(Icons.Default.KeyboardArrowUp, "Starting")
-        RDKStatus.STOPPED -> Icon(Icons.Default.KeyboardArrowDown, "Stopped")
-    }
-    Row {
-        widget
-        Text("bgState ${status.name}")
+    Row(horizontalArrangement = Arrangement.Start, modifier = Modifier
+        .fillMaxWidth()
+        .height(30.dp)) {
+        when (status) {
+            RDKStatus.STOPPING -> CircularProgressIndicator(modifier = Modifier.height(20.dp).width(20.dp))
+            RDKStatus.RUNNING -> Icon(Icons.Default.ArrowForward, "Running")
+            RDKStatus.WAIT_PERMISSION -> Icon(Icons.Default.Lock, "Waiting for permission")
+            RDKStatus.WAIT_CONFIG -> Icon(Icons.Default.Settings, "Waiting for config")
+            RDKStatus.STOPPED -> Icon(Icons.Default.KeyboardArrowDown, "Stopped")
+            RDKStatus.UNSET -> Icon(Icons.Default.Warning, "Unset")
+        }
+        Spacer(Modifier.width(10.dp))
+        Text("bgState ${status.name}", modifier = Modifier.weight(1f))
     }
 }
 
@@ -80,9 +92,9 @@ fun MyScaffold(activity: RDKLaunch) {
             TopAppBar(
                 title = { Text("Viam RDK") },
                 actions = {
-                    OutlinedButton(onClick = { activity.hardRestart() }, enabled = bgState == RDKStatus.STOPPED || bgState == RDKStatus.STOPPING) { Text("Restart") }
+                    OutlinedButton(onClick = { activity.hardRestart() }, enabled = bgState.restartable()) { Text("Restart") }
                     Spacer(Modifier.width(20.dp))
-                    OutlinedButton(onClick = { singleton?.stopAndDestroy() }, enabled = bgState == RDKStatus.RUNNING || bgState == RDKStatus.WAITING_TO_START) { Text("Stop") }
+                    OutlinedButton(onClick = { singleton?.stopAndDestroy() }, enabled = bgState.stoppable()) { Text("Stop") }
                 },
             )
         }

@@ -34,7 +34,15 @@ fun missingPerms(context: Context, perms: Array<String>): Array<String> {
 }
 
 enum class RDKStatus {
-    STOPPED, WAITING_TO_START, RUNNING, STOPPING
+    STOPPED, WAIT_CONFIG, WAIT_PERMISSION, RUNNING, STOPPING, UNSET;
+
+    fun restartable(): Boolean {
+        return this == STOPPING || this == STOPPED
+    }
+
+    fun stoppable(): Boolean {
+        return this == RUNNING || this == WAIT_CONFIG || this == WAIT_PERMISSION
+    }
 }
 
 class RDKThread() : Thread() {
@@ -65,12 +73,13 @@ class RDKThread() : Thread() {
 
     override fun run() {
         super.run()
-        status = RDKStatus.WAITING_TO_START
+        status = RDKStatus.WAIT_PERMISSION
         if (waitPerms) {
             permissionLoop()
         } else {
             Log.i(TAG, "waitPerms = false, skipping permissionLoop")
         }
+        status = RDKStatus.WAIT_CONFIG
         val path = File(confPath)
         val dirPath = path.parentFile?.toPath()
         if (dirPath == null) {
@@ -103,6 +112,7 @@ var singleton: RDKForegroundService? = null
 
 class RDKForegroundService : Service() {
     final val thread = RDKThread()
+    var timer: Timer? = null
 
     override fun onBind(intent: Intent): IBinder {
         return RDKBinder()
@@ -128,20 +138,14 @@ class RDKForegroundService : Service() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    // if stopping, force stop. otherwise, just stop.
+    // trigger RDK stop, destroy this service when done
     fun stopAndDestroy() {
-        // todo: state graph is a little wonky here around stopping while starting; it will stay in start loop I think
-        when (thread.status) {
-            RDKStatus.STOPPING -> {
-                // need to destroy the thread? but tricky -- the process will still have state
-                Log.i(TAG, "TODO FORCE STOP")
-            }
-            else -> {
-                thread.status = RDKStatus.STOPPING
-                droidStopHook()
-            }
+        thread.status = RDKStatus.STOPPING
+        droidStopHook()
+        if (timer == null) {
+            timer = Timer()
+            timer?.schedule(StopTimer(), 0, 250)
         }
-        Timer().schedule(StopTimer(), 0, 250)
     }
 
     inner class StopTimer : TimerTask() {
