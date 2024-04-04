@@ -117,7 +117,7 @@ fun MyScaffold(activity: RDKLaunch) {
         Spacer(Modifier.height(20.dp))
         TabLayout(listOf("Load json", "ID + secret", "Paste json")) {
             Column {
-                Button(onClick = { activity.savePref(defaultConfPath) }){
+                Button(onClick = { activity.savePref(defaultConfPath); jsonComment.value = jsonComments["default"] }){
                     Text("Use default /sdcard/Download/viam.json")
                 }
                 Button(onClick = activity::openFile) {

@@ -94,6 +94,12 @@ class RDKThread() : Thread() {
             }
         }
         Log.i(TAG, "found $path")
+        if (!path.canRead()) {
+            Log.e(TAG, "can't read path at $path, bailing")
+            // todo: communicate this in UX as state
+            return
+        }
+        // todo: I think we crash the entire process if the viam.json config fails to parse; be more graceful
         try {
             status = RDKStatus.RUNNING
             mainEntry(path.toString(), filesDir.toString())
