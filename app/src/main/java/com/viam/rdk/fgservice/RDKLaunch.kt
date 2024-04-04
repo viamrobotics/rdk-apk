@@ -28,6 +28,14 @@ import com.jakewharton.processphoenix.ProcessPhoenix
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
+val selectedTab = mutableStateOf<String?>(null)
+val jsonComments = mapOf(
+    "default" to "Default path in downloads",
+    "loaded" to "Loaded from disk",
+    "id-secret" to "From ID + secret",
+    "pasted" to "From pasted JSON",
+)
+val jsonComment = mutableStateOf(jsonComments["default"])
 
 fun serviceRunning(ctx: Context): Boolean {
     val manager = ctx.getSystemService(ComponentActivity.ACTIVITY_SERVICE) as ActivityManager

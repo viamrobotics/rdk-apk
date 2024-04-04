@@ -53,16 +53,18 @@ fun StateViewer(status: RDKStatus) {
     Row(horizontalArrangement = Arrangement.Start, modifier = Modifier
         .fillMaxWidth()
         .height(30.dp)) {
-        when (status) {
-            RDKStatus.STOPPING -> CircularProgressIndicator(modifier = Modifier.height(20.dp).width(20.dp))
-            RDKStatus.RUNNING -> Icon(Icons.Default.ArrowForward, "Running")
-            RDKStatus.WAIT_PERMISSION -> Icon(Icons.Default.Lock, "Waiting for permission")
-            RDKStatus.WAIT_CONFIG -> Icon(Icons.Default.Settings, "Waiting for config")
-            RDKStatus.STOPPED -> Icon(Icons.Default.KeyboardArrowDown, "Stopped")
-            RDKStatus.UNSET -> Icon(Icons.Default.Warning, "Unset")
+        val emoji = when (status) {
+            RDKStatus.STOPPING -> CircularProgressIndicator(modifier = Modifier
+                .height(20.dp)
+                .width(20.dp))
+            RDKStatus.RUNNING -> Text("\uD83C\uDD99")
+            RDKStatus.WAIT_PERMISSION -> Text("⏳\uD83D\uDD12")
+            RDKStatus.WAIT_CONFIG -> Text("⏳⚙")
+            RDKStatus.STOPPED -> Text("\uD83D\uDED1")
+            RDKStatus.UNSET -> Text("❓")
         }
         Spacer(Modifier.width(10.dp))
-        Text("bgState ${status.name}", modifier = Modifier.weight(1f))
+        Text("service state ${status.name}", modifier = Modifier.weight(1f))
     }
 }
 
@@ -111,47 +113,50 @@ fun MyScaffold(activity: RDKLaunch) {
 
         Text("viam.json path", style=MaterialTheme.typography.titleMedium)
         Text(activity.confPath.value)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = activity::openFile) {
-                Text("Load viam.json")
-            }
-            Button(onClick = { activity.savePref(defaultConfPath) }){
-                Text("Default viam.json")
-            }
-        }
-
         Spacer(Modifier.height(20.dp))
-
-        Text("ID and secret", style=MaterialTheme.typography.titleMedium)
-        Text("ID", style=MaterialTheme.typography.titleSmall)
-        BasicTextField(value = idValue, onValueChange = {idValue = it}, textStyle=mono, modifier = textMod)
-        Text("secret", style=MaterialTheme.typography.titleSmall)
-        BasicTextField(value = secretValue, onValueChange = {secretValue=it}, textStyle=mono, modifier = textMod)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = { activity.setIdKeyConfig(idValue, secretValue) }) {
-                Text("Apply key + secret")
+        TabLayout(listOf("Load json", "ID + secret", "Paste json")) {
+            Column {
+                Button(onClick = { activity.savePref(defaultConfPath) }){
+                    Text("Use default /sdcard/Download/viam.json")
+                }
+                Button(onClick = activity::openFile) {
+                    Text("Load viam.json")
+                }
             }
-            Button(onClick = { idValue = ""; secretValue = "" }) {
-                Text("Clear")
-            }
-        }
 
-        Spacer(Modifier.height(20.dp))
-
-        Text("Paste full json", style=MaterialTheme.typography.titleMedium)
-        BasicTextField(
-            value=fullJson,
-            onValueChange={fullJson = it},
-            textStyle = mono,
-            minLines = 3,
-            modifier = textMod,
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(onClick = { activity.setPastedConfig(fullJson) }) {
-                Text("Apply pasted config")
+            Column {
+                Text("ID and secret", style=MaterialTheme.typography.titleMedium)
+                Text("ID", style=MaterialTheme.typography.titleSmall)
+                BasicTextField(value = idValue, onValueChange = {idValue = it}, textStyle=mono, modifier = textMod)
+                Text("secret", style=MaterialTheme.typography.titleSmall)
+                BasicTextField(value = secretValue, onValueChange = {secretValue=it}, textStyle=mono, modifier = textMod)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Button(onClick = { activity.setIdKeyConfig(idValue, secretValue) }) {
+                        Text("Apply key + secret")
+                    }
+                    Button(onClick = { idValue = ""; secretValue = "" }) {
+                        Text("Clear")
+                    }
+                }
             }
-            Button(onClick = { fullJson = "" }) {
-                Text("Clear")
+
+            Column {
+                Text("Paste full json", style=MaterialTheme.typography.titleMedium)
+                BasicTextField(
+                    value=fullJson,
+                    onValueChange={fullJson = it},
+                    textStyle = mono,
+                    minLines = 3,
+                    modifier = textMod,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Button(onClick = { activity.setPastedConfig(fullJson) }) {
+                        Text("Apply pasted config")
+                    }
+                    Button(onClick = { fullJson = "" }) {
+                        Text("Clear")
+                    }
+                }
             }
         }
     }
