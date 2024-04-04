@@ -86,13 +86,13 @@ class RDKThread() : Thread() {
             Log.i(TAG, "confPath $confPath parentFile is null")
             return
         }
-        val watcher = dirPath.fileSystem.newWatchService()
-        while (!path.exists()) {
-            Log.i(TAG, "waiting for viam.json at $path")
-            dirPath.register(watcher, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
-            watcher.take()
+        dirPath.fileSystem.newWatchService().use {
+            while (!path.exists()) {
+                Log.i(TAG, "waiting for viam.json at $path")
+                dirPath.register(it, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
+                it.take()
+            }
         }
-        watcher.close()
         Log.i(TAG, "found $path")
         try {
             status = RDKStatus.RUNNING
