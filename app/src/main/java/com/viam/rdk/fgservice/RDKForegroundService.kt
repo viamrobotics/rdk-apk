@@ -18,6 +18,8 @@ import droid.Droid.mainEntry
 import droid.Droid.droidStopHook
 import java.io.File
 import java.nio.file.StandardWatchEventKinds
+import java.util.Timer
+import java.util.TimerTask
 import kotlin.io.path.exists
 
 
@@ -31,11 +33,24 @@ fun missingPerms(context: Context, perms: Array<String>): Array<String> {
     }).toTypedArray()
 }
 
+enum class RDKStatus {
+    STOPPED, WAIT_CONFIG, WAIT_PERMISSION, RUNNING, STOPPING, UNSET;
+
+    fun restartable(): Boolean {
+        return this == STOPPING || this == STOPPED
+    }
+
+    fun stoppable(): Boolean {
+        return this == RUNNING || this == WAIT_CONFIG || this == WAIT_PERMISSION
+    }
+}
+
 class RDKThread() : Thread() {
     lateinit var filesDir: java.io.File
     lateinit var context: Context
     lateinit var confPath: String
     var waitPerms: Boolean = true
+    var status: RDKStatus = RDKStatus.STOPPED
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -58,45 +73,60 @@ class RDKThread() : Thread() {
 
     override fun run() {
         super.run()
+        status = RDKStatus.WAIT_PERMISSION
         if (waitPerms) {
             permissionLoop()
         } else {
             Log.i(TAG, "waitPerms = false, skipping permissionLoop")
         }
+        status = RDKStatus.WAIT_CONFIG
         val path = File(confPath)
         val dirPath = path.parentFile?.toPath()
         if (dirPath == null) {
             Log.i(TAG, "confPath $confPath parentFile is null")
             return
         }
-        val watcher = dirPath.fileSystem.newWatchService()
-        while (!path.exists()) {
-            Log.i(TAG, "waiting for viam.json at $path")
-            dirPath.register(watcher, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
-            watcher.take()
+        dirPath.fileSystem.newWatchService().use {
+            while (!path.exists()) {
+                Log.i(TAG, "waiting for viam.json at $path")
+                dirPath.register(it, arrayOf(StandardWatchEventKinds.ENTRY_CREATE))
+                it.take()
+            }
         }
-        watcher.close()
         Log.i(TAG, "found $path")
+        if (!path.canRead()) {
+            Log.e(TAG, "can't read path at $path, bailing")
+            // todo: communicate this in UX as state
+            return
+        }
+        // todo: I think we crash the entire process if the viam.json config fails to parse; be more graceful
         try {
+            status = RDKStatus.RUNNING
             mainEntry(path.toString(), filesDir.toString())
         } catch (e: Exception) {
             Log.e(TAG, "viam thread caught error $e")
         } finally {
             Log.i(TAG, "finished viam thread")
         }
+        status = RDKStatus.STOPPED
     }
 }
 
 class RDKBinder : Binder() {}
 
+var singleton: RDKForegroundService? = null
+
 class RDKForegroundService : Service() {
-    private final val thread = RDKThread()
+    final val thread = RDKThread()
+    var timer: Timer? = null
+
     override fun onBind(intent: Intent): IBinder {
         return RDKBinder()
     }
 
     override fun onCreate() {
         super.onCreate()
+        singleton = this
         val chan = NotificationChannel("background", "background", NotificationManager.IMPORTANCE_HIGH)
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(chan)
         val notif = Notification.Builder(this, chan.id).setContentText("The RDK is running in the background").setSmallIcon(R.mipmap.ic_launcher).build()
@@ -107,6 +137,7 @@ class RDKForegroundService : Service() {
         thread.filesDir = cacheDir
         thread.context = applicationContext
         val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        // todo: can just set these values directly, don't need to do through prefs
         thread.confPath = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
         thread.waitPerms = prefs.getBoolean("waitPerms", true)
         Log.i(TAG, "got confPath ${thread.confPath}")
@@ -114,9 +145,29 @@ class RDKForegroundService : Service() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    override fun onDestroy() {
-        // todo: figure out how to stop thread -- need to send exit command to RDK via exported API
-        super.onDestroy()
+    // trigger RDK stop, destroy this service when done
+    fun stopAndDestroy() {
+        thread.status = RDKStatus.STOPPING
         droidStopHook()
+        if (timer == null) {
+            timer = Timer()
+            timer?.schedule(StopTimer(), 0, 250)
+        }
+    }
+
+    inner class StopTimer : TimerTask() {
+        override fun run() {
+            if (thread.status == RDKStatus.STOPPED) {
+                Log.i(TAG, "StopTimer found STOPPED")
+                cancel()
+                stopSelf()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        singleton = null
+        Log.i(TAG, "service destroyed")
     }
 }

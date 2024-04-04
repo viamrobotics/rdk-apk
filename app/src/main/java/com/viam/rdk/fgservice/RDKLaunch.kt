@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
+import android.net.Uri
 import android.os.Environment
 import android.preference.PreferenceManager
 import android.provider.DocumentsContract
@@ -12,14 +13,23 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.Timer
+import java.util.TimerTask
+import com.jakewharton.processphoenix.ProcessPhoenix
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
+val selectedTab = mutableStateOf<String?>(null)
+val jsonComments = mapOf(
+    "default" to "from default path in downloads",
+    "id-secret" to "from ID + secret",
+    "pasted" to "from pasted JSON",
+)
+val jsonComment = mutableStateOf(jsonComments["default"])
 
 fun serviceRunning(ctx: Context): Boolean {
     val manager = ctx.getSystemService(ComponentActivity.ACTIVITY_SERVICE) as ActivityManager
@@ -41,8 +51,8 @@ fun maybeStart(ctx: Context) {
 }
 
 fun maybeStop(ctx: Context) {
-    if (serviceRunning(ctx)) {
-        ctx.stopService(Intent(ctx, RDKForegroundService::class.java))
+    if (singleton != null) {
+        singleton?.stopAndDestroy()
     } else {
         Log.i(TAG, "not stopping service, already down")
     }
@@ -53,15 +63,37 @@ class RDKLaunch : ComponentActivity(){
     // todo: persist this please
     val confPath = mutableStateOf(defaultConfPath)
     val perms = mutableStateOf(mapOf<String, Boolean>())
+    private lateinit var timer: Timer;
+    val bgState = mutableStateOf(RDKStatus.STOPPED)
+
+    inner class CheckService() : TimerTask() {
+        override fun run() {
+            val newVal = singleton?.thread?.status ?: RDKStatus.STOPPED
+            if (newVal != bgState.value) {
+                Log.i(TAG, "bgState transition ${bgState.value} -> $newVal")
+            }
+            bgState.value = newVal
+        }
+    }
 
     override fun onStart() {
         super.onStart()
-        confPath.value = PreferenceManager.getDefaultSharedPreferences(this).getString("confPath", defaultConfPath) ?: defaultConfPath
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        confPath.value = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
+        jsonComment.value = prefs.getString("jsonComment", jsonComment.value)
         refreshPermissions()
         maybeStart(this)
+        timer = Timer()
+        timer.schedule(CheckService(), 1000, 1000)
         setContent {
             MyScaffold(this)
         }
+    }
+
+    fun setJsonComment(value: String) {
+        jsonComment.value = value
+        val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        prefs.edit().putString("jsonComment", value).apply() // todo: is this blocking?
     }
 
     // send open_document intent which we catch in onActivityResult + write to a json config
@@ -71,6 +103,7 @@ class RDKLaunch : ComponentActivity(){
             type = "application/json"
         }
         startActivityForResult(intent, 2)
+        // see onActivityResult for the continuation of this
     }
 
     // write passed value to a json config
@@ -78,8 +111,16 @@ class RDKLaunch : ComponentActivity(){
         val path = filesDir.resolve("pasted.viam.json")
         writeString(value, path)
         savePref(path.toString())
+        setJsonComment(jsonComments["pasted"]!!)
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
+    }
+
+    // destroy the process and start it again afterwards. killProcess removes Activity + Service.
+    // necessary because we have no other way to clean up the RDK's in-memory state
+    // (and we don't want to use a subprocess bc android)
+    fun hardRestart() {
+        ProcessPhoenix.triggerRebirth(this);
     }
 
     fun setIdKeyConfig(id: String, key: String) {
@@ -87,11 +128,13 @@ class RDKLaunch : ComponentActivity(){
         val path = filesDir.resolve("id-secret.viam.json")
         writeString(fullJson, path)
         savePref(path.toString())
+        setJsonComment(jsonComments["id-secret"]!!)
         // todo: signal bg service
         Toast.makeText(this, "copied to $path", Toast.LENGTH_SHORT).show()
+
     }
 
-    // save path to shared preferences. used for persistence + to communicate w/ service
+    // save viam.json path to shared preferences. used for persistence + to communicate w/ service
     fun savePref(value: String) {
         confPath.value = value
         val editor = PreferenceManager.getDefaultSharedPreferences(this).edit()
@@ -103,8 +146,8 @@ class RDKLaunch : ComponentActivity(){
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         Log.i(TAG, "activity result $requestCode $resultCode $data")
-        data?.data?.also {
-            uri -> Log.i(TAG, "uri is $uri")
+        data?.data?.also { uri ->
+            Log.i(TAG, "uri is $uri")
             if (DocumentsContract.isDocumentUri(this, uri)) {
                 Log.i(TAG,"opening URI $uri")
                 val fd = contentResolver.openFileDescriptor(uri, "r")
@@ -122,6 +165,7 @@ class RDKLaunch : ComponentActivity(){
                 } finally {
                     fd?.close()
                 }
+                setJsonComment("loaded from URI: ${formatUri(uri)}")
             } else {
                 Toast.makeText(this, "not a document URI", Toast.LENGTH_SHORT).show()
             }
@@ -169,4 +213,8 @@ fun writeString(value: String, path: File) {
     } finally {
         output?.close()
     }
+}
+
+fun formatUri(uri: Uri): String {
+    return "${uri.authority}${uri.path}"
 }
