@@ -20,6 +20,7 @@ jobs:
         repository: ${{ inputs.repository }}
         ref: ${{ inputs.ref }}
         path: rdk
+        fetch-tags: true # need tags for git describe
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
     - name: build x264
