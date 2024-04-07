@@ -24,7 +24,7 @@ jobs:
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
     - name: build x264
-      if: hashFiles('etc/android/build-x264.sh') != ''
+      if: hashFiles('rdk/etc/android/build-x264.sh') != ''
       working-directory: rdk
       run: |
         make etc/android/prefix/aarch64
