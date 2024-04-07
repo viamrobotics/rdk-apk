@@ -31,7 +31,8 @@ jobs:
         make etc/android/prefix/x86_64
     - name: build tflite
       working-directory: rdk
-      if: false # I think this is checked in, doesn't need to be built every time. delete step if unused
+      # we need tflite headers but not the full build. add SRC_ONLY flag
+      # if: false
       run: ANDROID_NDK=$NDK_ROOT KEEP_TFLITE_SRC=1 etc/android/build-tflite.sh
     # todo: per-platorm AAR so this is 2 x 100mb instead of 200mb
     - name: build AAR
