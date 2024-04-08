@@ -14,8 +14,8 @@ import android.os.IBinder
 import android.preference.PreferenceManager
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import droid.Droid.mainEntry
 import droid.Droid.droidStopHook
+import droid.Droid.mainEntry
 import java.io.File
 import java.nio.file.StandardWatchEventKinds
 import java.util.Timer
@@ -102,7 +102,8 @@ class RDKThread() : Thread() {
         // todo: I think we crash the entire process if the viam.json config fails to parse; be more graceful
         try {
             status = RDKStatus.RUNNING
-            mainEntry(path.toString(), filesDir.toString())
+            val osEnv = System.getenv().entries.joinToString(separator = "\n") { "${it.key}=${it.value}" }
+            mainEntry(path.toString(), filesDir.toString(), osEnv)
         } catch (e: Exception) {
             Log.e(TAG, "viam thread caught error $e")
         } finally {
