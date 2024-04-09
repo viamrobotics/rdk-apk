@@ -1,8 +1,11 @@
 package com.viam.rdk.fgservice
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
 import android.net.Uri
@@ -14,12 +17,18 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
+import com.jakewharton.processphoenix.ProcessPhoenix
+import dalvik.system.PathClassLoader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.SecureRandom
 import java.util.Timer
 import java.util.TimerTask
-import com.jakewharton.processphoenix.ProcessPhoenix
+import java.util.function.Supplier
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
@@ -30,6 +39,7 @@ val jsonComments = mapOf(
     "pasted" to "from pasted JSON",
 )
 val jsonComment = mutableStateOf(jsonComments["default"])
+val moduleSecret = mutableStateOf<String?>(null)
 
 fun serviceRunning(ctx: Context): Boolean {
     val manager = ctx.getSystemService(ComponentActivity.ACTIVITY_SERVICE) as ActivityManager
@@ -58,6 +68,41 @@ fun maybeStop(ctx: Context) {
     }
 }
 
+class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver() {
+
+    override fun onReceive(contxt: Context?, intent: Intent?) {
+        if (intent == null) {
+            return
+        }
+
+        Thread {
+            val loader =
+                PathClassLoader(
+                    intent.getStringExtra("java_class_path"),
+                    intent.getStringExtra("java_library_path"),
+                    ClassLoader.getSystemClassLoader());
+            val modCls = Class.forName("com.viam.sdk.android.module.Module", true, loader)
+            val parentContextField = modCls.getDeclaredField("parentContext")
+            parentContextField.isAccessible = true
+            parentContextField.set(modCls, Supplier {
+                applicationContext
+            })
+            val mainCls =
+                Class.forName(intent.getStringExtra("java_entry_point_class"), true, loader)
+            val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
+            var exitCode = 0
+            try {
+                mainMethod.invoke(null, intent.getStringExtra("java_entry_point_args")!!.split("\n").toTypedArray())
+            } catch (t: Throwable) {
+                Log.e(TAG, "error invoking main for " + intent.getStringExtra("java_entry_point_class"), t)
+                exitCode = 1
+            } finally {
+                File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
+            }
+        }.start()
+    }
+}
+
 // todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : ComponentActivity(){
     // todo: persist this please
@@ -76,12 +121,30 @@ class RDKLaunch : ComponentActivity(){
         }
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @OptIn(ExperimentalEncodingApi::class)
     override fun onStart() {
         super.onStart()
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         confPath.value = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
         jsonComment.value = prefs.getString("jsonComment", jsonComment.value)
+        moduleSecret.value = prefs.getString("moduleSecret", moduleSecret.value)
+        if (moduleSecret.value == null) {
+            val secureRandom = SecureRandom()
+            val bytes = ByteArray(64)
+            secureRandom.nextBytes(bytes)
+            Base64.encode(bytes)
+            val secretKey = Base64.encode(bytes)
+            prefs.edit().putString("moduleSecret", secretKey).apply()
+            moduleSecret.value = secretKey
+        }
         refreshPermissions()
+
+        applicationContext.registerReceiver(
+            ModuleStartReceiver(applicationContext),
+            IntentFilter("com.viam.rdk.fgservice.START_MODULE"),
+        )
+
         maybeStart(this)
         timer = Timer()
         timer.schedule(CheckService(), 1000, 1000)

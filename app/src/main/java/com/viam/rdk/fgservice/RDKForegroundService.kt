@@ -12,12 +12,14 @@ import android.os.Binder
 import android.os.Environment
 import android.os.IBinder
 import android.preference.PreferenceManager
+import android.system.Os
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import droid.Droid.droidStopHook
 import droid.Droid.mainEntry
 import java.io.File
 import java.nio.file.StandardWatchEventKinds
+import java.util.EnumSet.copyOf
 import java.util.Timer
 import java.util.TimerTask
 import kotlin.io.path.exists
@@ -102,8 +104,14 @@ class RDKThread() : Thread() {
         // todo: I think we crash the entire process if the viam.json config fails to parse; be more graceful
         try {
             status = RDKStatus.RUNNING
-            val osEnv = System.getenv().entries.joinToString(separator = "\n") { "${it.key}=${it.value}" }
-            mainEntry(path.toString(), filesDir.toString(), osEnv)
+            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+            val osEnv = System.getenv().toMutableMap()
+            assert(prefs.contains("moduleSecret"))
+            osEnv["_VIAM_FG_SECRET"] = prefs.getString("moduleSecret", "INVARIANT")
+            osEnv["_VIAM_FG_UID"] = Os.getuid().toString()
+            osEnv["_VIAM_FG_TEMP_DIR"] = context.cacheDir.path;
+            val osEnvStr = osEnv.entries.joinToString(separator = "\n") { "${it.key}=${it.value}" }
+            mainEntry(path.toString(), filesDir.toString(), osEnvStr)
         } catch (e: Exception) {
             Log.e(TAG, "viam thread caught error $e")
         } finally {
