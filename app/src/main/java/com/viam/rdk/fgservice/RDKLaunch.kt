@@ -39,7 +39,7 @@ val jsonComments = mapOf(
     "pasted" to "from pasted JSON",
 )
 val jsonComment = mutableStateOf(jsonComments["default"])
-val moduleSecret = mutableStateOf<String?>(null)
+var moduleSecret: String? = null
 
 fun serviceRunning(ctx: Context): Boolean {
     val manager = ctx.getSystemService(ComponentActivity.ACTIVITY_SERVICE) as ActivityManager
@@ -75,7 +75,29 @@ class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver()
             return
         }
 
+        if (intent.extras == null || !intent.extras!!.containsKey("secret")) {
+            Log.e(TAG, "START_MODULE called without secret")
+            return
+        }
+        val intentSecret = intent.getStringExtra("secret");
+        if (!intentSecret.equals(moduleSecret)) {
+            Log.e(TAG, "START_MODULE called with incorrect secret")
+            return
+        }
+
+        // todo: link this to the module killer. need to save the thread and have a STOP_MODULE
+        //  intent that is called on trap from the shell script
         Thread {
+            // this is the loader for the module's jar and its associated libraries
+            // Note: Shared libraries have not been tested yet; they may interfere with
+            // this process' own loaded libraries.
+            // The intent is broadcast from the module's executed shell script and contains:
+            // secret - moduleSecret that this process creates
+            // proc_file - the file to write the results (exit code) of the main entry point to
+            // java_class_path - the class path to search for all classes related to the entry point
+            // java_library_path - the library path for any libraries we may need (untested)
+            // java_entry_point_class - the class containing the main function
+            // java_entry_point_args - the args to invoke with
             val loader =
                 PathClassLoader(
                     intent.getStringExtra("java_class_path"),
@@ -92,6 +114,7 @@ class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver()
             val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
             var exitCode = 0
             try {
+                // on the shell script side, we combine the args with IFS=\n
                 mainMethod.invoke(null, intent.getStringExtra("java_entry_point_args")!!.split("\n").toTypedArray())
             } catch (t: Throwable) {
                 Log.e(TAG, "error invoking main for " + intent.getStringExtra("java_entry_point_class"), t)
@@ -128,18 +151,19 @@ class RDKLaunch : ComponentActivity(){
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         confPath.value = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
         jsonComment.value = prefs.getString("jsonComment", jsonComment.value)
-        moduleSecret.value = prefs.getString("moduleSecret", moduleSecret.value)
-        if (moduleSecret.value == null) {
+        moduleSecret = prefs.getString("moduleSecret", moduleSecret)
+        if (moduleSecret == null) {
             val secureRandom = SecureRandom()
             val bytes = ByteArray(64)
             secureRandom.nextBytes(bytes)
             Base64.encode(bytes)
             val secretKey = Base64.encode(bytes)
             prefs.edit().putString("moduleSecret", secretKey).apply()
-            moduleSecret.value = secretKey
+            moduleSecret = secretKey
         }
         refreshPermissions()
 
+        // todo: make it configurable from UI or json config
         applicationContext.registerReceiver(
             ModuleStartReceiver(applicationContext),
             IntentFilter("com.viam.rdk.fgservice.START_MODULE"),
