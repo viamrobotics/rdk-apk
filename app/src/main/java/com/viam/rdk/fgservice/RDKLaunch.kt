@@ -1,8 +1,11 @@
 package com.viam.rdk.fgservice
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
 import android.net.Uri
@@ -14,12 +17,18 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
+import com.jakewharton.processphoenix.ProcessPhoenix
+import dalvik.system.PathClassLoader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.SecureRandom
 import java.util.Timer
 import java.util.TimerTask
-import com.jakewharton.processphoenix.ProcessPhoenix
+import java.util.function.Supplier
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+
 
 private const val TAG = "RDKLaunch"
 val defaultConfPath = Environment.getExternalStorageDirectory().toPath().resolve("Download/viam.json").toString()
@@ -30,6 +39,7 @@ val jsonComments = mapOf(
     "pasted" to "from pasted JSON",
 )
 val jsonComment = mutableStateOf(jsonComments["default"])
+var moduleSecret: String? = null
 
 fun serviceRunning(ctx: Context): Boolean {
     val manager = ctx.getSystemService(ComponentActivity.ACTIVITY_SERVICE) as ActivityManager
@@ -58,6 +68,64 @@ fun maybeStop(ctx: Context) {
     }
 }
 
+class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver() {
+
+    override fun onReceive(contxt: Context?, intent: Intent?) {
+        if (intent == null) {
+            return
+        }
+
+        if (intent.extras == null || !intent.extras!!.containsKey("secret")) {
+            Log.e(TAG, "START_MODULE called without secret")
+            return
+        }
+        val intentSecret = intent.getStringExtra("secret");
+        if (!intentSecret.equals(moduleSecret)) {
+            Log.e(TAG, "START_MODULE called with incorrect secret")
+            return
+        }
+
+        // todo: link this to the module killer. need to save the thread and have a STOP_MODULE
+        //  intent that is called on trap from the shell script
+        Thread {
+            // this is the loader for the module's jar and its associated libraries
+            // Note: Shared libraries have not been tested yet; they may interfere with
+            // this process' own loaded libraries.
+            // The intent is broadcast from the module's executed shell script and contains:
+            // secret - moduleSecret that this process creates
+            // proc_file - the file to write the results (exit code) of the main entry point to
+            // java_class_path - the class path to search for all classes related to the entry point
+            // java_library_path - the library path for any libraries we may need (untested)
+            // java_entry_point_class - the class containing the main function
+            // java_entry_point_args - the args to invoke with
+            val loader =
+                PathClassLoader(
+                    intent.getStringExtra("java_class_path"),
+                    intent.getStringExtra("java_library_path"),
+                    ClassLoader.getSystemClassLoader());
+            val modCls = Class.forName("com.viam.sdk.android.module.Module", true, loader)
+            val parentContextField = modCls.getDeclaredField("parentContext")
+            parentContextField.isAccessible = true
+            parentContextField.set(modCls, Supplier {
+                applicationContext
+            })
+            val mainCls =
+                Class.forName(intent.getStringExtra("java_entry_point_class"), true, loader)
+            val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
+            var exitCode = 0
+            try {
+                // on the shell script side, we combine the args with IFS=\n
+                mainMethod.invoke(null, intent.getStringExtra("java_entry_point_args")!!.split("\n").toTypedArray())
+            } catch (t: Throwable) {
+                Log.e(TAG, "error invoking main for " + intent.getStringExtra("java_entry_point_class"), t)
+                exitCode = 1
+            } finally {
+                File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
+            }
+        }.start()
+    }
+}
+
 // todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : ComponentActivity(){
     // todo: persist this please
@@ -76,12 +144,31 @@ class RDKLaunch : ComponentActivity(){
         }
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @OptIn(ExperimentalEncodingApi::class)
     override fun onStart() {
         super.onStart()
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         confPath.value = prefs.getString("confPath", defaultConfPath) ?: defaultConfPath
         jsonComment.value = prefs.getString("jsonComment", jsonComment.value)
+        moduleSecret = prefs.getString("moduleSecret", moduleSecret)
+        if (moduleSecret == null) {
+            val secureRandom = SecureRandom()
+            val bytes = ByteArray(64)
+            secureRandom.nextBytes(bytes)
+            Base64.encode(bytes)
+            val secretKey = Base64.encode(bytes)
+            prefs.edit().putString("moduleSecret", secretKey).apply()
+            moduleSecret = secretKey
+        }
         refreshPermissions()
+
+        // todo: make it configurable from UI or json config
+        applicationContext.registerReceiver(
+            ModuleStartReceiver(applicationContext),
+            IntentFilter("com.viam.rdk.fgservice.START_MODULE"),
+        )
+
         maybeStart(this)
         timer = Timer()
         timer.schedule(CheckService(), 1000, 1000)
