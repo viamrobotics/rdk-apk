@@ -50,13 +50,14 @@ jobs:
       run: |
         mkdir ../dist
         source $SDKMAN_DIR/bin/sdkman-init.sh
+        export APK_VERSION_SUFFIX=-$(date +%y%m%d)-$(cd ../rdk && git rev-parse --short HEAD)-$(git rev-parse --short HEAD)
         # todo(review): is it safe to use gradle in path instead of gradlew? or way to make gradlew use system gradle?
         RDK_PATH=$(realpath ../rdk/droid-rdk.arm64.aar) gradle --no-daemon assembleDebug
         mv app/build/outputs/apk/debug/app-debug.apk \
-          ../dist/rdk-$(date +%y%m%d)-$(cd ../rdk && git rev-parse --short HEAD)-$(git rev-parse --short HEAD).aarch64.apk
+          ../dist/rdk$APK_VERSION_SUFFIX.aarch64.apk
         RDK_PATH=$(realpath ../rdk/droid-rdk.amd64.aar) gradle --no-daemon assembleDebug
         mv app/build/outputs/apk/debug/app-debug.apk \
-          ../dist/rdk-$(date +%y%m%d)-$(cd ../rdk && git rev-parse --short HEAD)-$(git rev-parse --short HEAD).x86_64.apk
+          ../dist/rdk$APK_VERSION_SUFFIX.x86_64.apk
     - uses: actions/upload-artifact@v4
       with:
         name: Arm APK
