@@ -188,13 +188,21 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
                     if (t !is InterruptedException) {
                         Log.e(
                             TAG,
-                            "error invoking main for " + intent.getStringExtra("java_entry_point_class"),
+                            "error invoking main for " + entryPointClass,
                             t
                         )
                         exitCode = 1
                     }
                 } finally {
                     File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
+                }
+            } catch (t: Throwable) {
+                if (t !is InterruptedException) {
+                    Log.e(
+                        TAG,
+                        "error running thread for " + entryPointClass,
+                        t
+                    )
                 }
             } finally {
                 val threads = threadsRef.get()
