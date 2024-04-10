@@ -23,7 +23,7 @@ jobs:
     - name: extract keystore
       # we do this so CI builds have consistent signing. otherwise you cannot `adb install` without uninstalling first
       run: |
-        [ -n "$DEBUG_KEYSTORE" ] && echo "$DEBUG_KEYSTORE" | base64 > ~/.android/debug.keystore
+        [ -n "${{ secrets.DEBUG_KEYSTORE }}" ] && echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 > ~/.android/debug.keystore
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
     - name: build x264
