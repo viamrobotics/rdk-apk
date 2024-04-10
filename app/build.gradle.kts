@@ -12,7 +12,7 @@ android {
         minSdk = 28
         targetSdk = 28
         versionCode = 2
-        versionName = "${System.getenv("APK_VERSION" ?: "0.1.0"}${System.getenv("APK_VERSION_SUFFIX") ?: ""}"
+        versionName = "${System.getenv("APK_VERSION") ?: "0.1.0"}${System.getenv("APK_VERSION_SUFFIX") ?: ""}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
