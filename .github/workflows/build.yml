@@ -22,8 +22,11 @@ jobs:
         path: rdk
     - name: extract keystore
       # we do this so CI builds have consistent signing. otherwise you cannot `adb install` without uninstalling first
+      env:
+        DEBUG_KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
       run: |
-        [ -n "${{ secrets.DEBUG_KEYSTORE }}" ] && echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 > ~/.android/debug.keystore
+        mkdir -p ~/.android
+        [ -n "$DEBUG_KEYSTORE" ] && echo "$DEBUG_KEYSTORE" | base64 > ~/.android/debug.keystore
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
     - name: build x264
