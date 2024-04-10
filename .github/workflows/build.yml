@@ -20,8 +20,6 @@ jobs:
         repository: ${{ inputs.repository }}
         ref: ${{ inputs.ref }}
         path: rdk
-        fetch-tags: true # need tags for git describe
-        fetch-depth: '250' # for git describe
     # todo: put tflite and x264 in same etc/android/prefix, then try pkgconfig
     # todo: look at short-lived cache of etc/android/prefix
     - name: build x264
@@ -48,10 +46,10 @@ jobs:
         # todo(review): is it safe to use gradle in path instead of gradlew? or way to make gradlew use system gradle?
         RDK_PATH=$(realpath ../rdk/droid-rdk.arm64.aar) gradle --no-daemon assembleDebug
         mv app/build/outputs/apk/debug/app-debug.apk \
-          ../dist/rdk-$(date +%y%m%d)-$(cd ../rdk && git describe --tags)-$(git rev-parse --short HEAD).aarch64.apk
+          ../dist/rdk-$(date +%y%m%d)-$(cd ../rdk && git rev-parse --short HEAD)-$(git rev-parse --short HEAD).aarch64.apk
         RDK_PATH=$(realpath ../rdk/droid-rdk.amd64.aar) gradle --no-daemon assembleDebug
         mv app/build/outputs/apk/debug/app-debug.apk \
-          ../dist/rdk-$(date +%y%m%d)-$(cd ../rdk && git describe --tags)-$(git rev-parse --short HEAD).x86_64.apk
+          ../dist/rdk-$(date +%y%m%d)-$(cd ../rdk && git rev-parse --short HEAD)-$(git rev-parse --short HEAD).x86_64.apk
     - uses: actions/upload-artifact@v4
       with:
         name: Arm APK
