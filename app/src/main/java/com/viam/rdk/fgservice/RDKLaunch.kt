@@ -70,24 +70,51 @@ fun maybeStop(ctx: Context) {
 
 class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver() {
 
+    val threads: MutableMap<String, MutableList<Thread>> = mutableMapOf()
+
+    companion object {
+        val START_ACTION = "com.viam.rdk.fgservice.START_MODULE"
+        val STOP_ACTION = "com.viam.rdk.fgservice.STOP_MODULE"
+    }
+
     override fun onReceive(contxt: Context?, intent: Intent?) {
         if (intent == null) {
             return
         }
 
-        if (intent.extras == null || !intent.extras!!.containsKey("secret")) {
-            Log.e(TAG, "START_MODULE called without secret")
-            return
+        when (intent.action) {
+            ModuleStartReceiver.START_ACTION, ModuleStartReceiver.STOP_ACTION -> {
+                if (intent.extras == null || !intent.extras!!.containsKey("secret")) {
+                    Log.e(TAG, "${intent.action} called without secret")
+                    return
+                }
+                val intentSecret = intent.getStringExtra("secret");
+                if (!intentSecret.equals(moduleSecret)) {
+                    Log.e(TAG, "${intent.action} called with incorrect secret")
+                    return
+                }
+            }
+            else -> {
+                Log.e(TAG, "${intent.action} unsupported")
+                return
+            }
         }
-        val intentSecret = intent.getStringExtra("secret");
-        if (!intentSecret.equals(moduleSecret)) {
-            Log.e(TAG, "START_MODULE called with incorrect secret")
+
+        val entryPointClass = intent.getStringExtra("java_entry_point_class")!!;
+        if (intent.action.equals(STOP_ACTION)) {
+            synchronized(threads) {
+                if (!threads.containsKey(entryPointClass)) {
+                    return
+                }
+                threads[entryPointClass]!!.forEach {
+                    it.interrupt()
+                }
+                threads.remove(entryPointClass)
+            }
             return
         }
 
-        // todo: link this to the module killer. need to save the thread and have a STOP_MODULE
-        //  intent that is called on trap from the shell script
-        Thread {
+        val thread = Thread {
             // this is the loader for the module's jar and its associated libraries
             // Note: Shared libraries have not been tested yet; they may interfere with
             // this process' own loaded libraries.
@@ -98,11 +125,22 @@ class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver()
             // java_library_path - the library path for any libraries we may need (untested)
             // java_entry_point_class - the class containing the main function
             // java_entry_point_args - the args to invoke with
+
+            // todo: we need to test on newer android versions what happens when
+            //  a shared libraries is loaded, then this module is unloaded and reloaded again.
+            //  The unloading of shared libraries happens at GC but we don't control that. We may
+            //  need to try using a finalizer on the ClassLoaders such that we block
+            //  future attempts to re-load the same module until GC has happened. This may
+            //  require encouraging GC to happen.
             val loader =
                 PathClassLoader(
                     intent.getStringExtra("java_class_path"),
                     intent.getStringExtra("java_library_path"),
                     ClassLoader.getSystemClassLoader());
+            val fakeCtxCls = Class.forName("com.viam.sdk.android.module.fake.FakeContext", true, loader)
+            val fakeCtxAccessibleField = fakeCtxCls.getDeclaredField("accessible")
+            fakeCtxAccessibleField.isAccessible = true
+            fakeCtxAccessibleField.set(fakeCtxCls, false)
             val modCls = Class.forName("com.viam.sdk.android.module.Module", true, loader)
             val parentContextField = modCls.getDeclaredField("parentContext")
             parentContextField.isAccessible = true
@@ -110,19 +148,29 @@ class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver()
                 applicationContext
             })
             val mainCls =
-                Class.forName(intent.getStringExtra("java_entry_point_class"), true, loader)
+                Class.forName(entryPointClass, true, loader)
             val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
             var exitCode = 0
             try {
                 // on the shell script side, we combine the args with IFS=\n
                 mainMethod.invoke(null, intent.getStringExtra("java_entry_point_args")!!.split("\n").toTypedArray())
             } catch (t: Throwable) {
-                Log.e(TAG, "error invoking main for " + intent.getStringExtra("java_entry_point_class"), t)
-                exitCode = 1
+                if (t !is InterruptedException) {
+                    Log.e(TAG, "error invoking main for " + intent.getStringExtra("java_entry_point_class"), t)
+                    exitCode = 1
+                }
             } finally {
                 File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
             }
-        }.start()
+        }
+
+        synchronized(threads) {
+            if (!threads.containsKey(entryPointClass)) {
+                threads[entryPointClass] = mutableListOf()
+            }
+            threads[entryPointClass]!!.add(thread)
+        }
+        thread.start()
     }
 }
 
@@ -164,9 +212,12 @@ class RDKLaunch : ComponentActivity(){
         refreshPermissions()
 
         // todo: make it configurable from UI or json config
+        val intentFilter = IntentFilter()
+        intentFilter.addAction(ModuleStartReceiver.START_ACTION)
+        intentFilter.addAction(ModuleStartReceiver.STOP_ACTION)
         applicationContext.registerReceiver(
             ModuleStartReceiver(applicationContext),
-            IntentFilter("com.viam.rdk.fgservice.START_MODULE"),
+            intentFilter,
         )
 
         maybeStart(this)
