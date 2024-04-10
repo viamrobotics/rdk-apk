@@ -42,3 +42,47 @@ More links:
 - https://viam.atlassian.net/browse/RSDK-6558 for history of the issue for us
 - https://github.com/termux/termux-app/discussions/3372 for summary of termux approach
 - https://android.googlesource.com/platform/system/sepolicy/+/master/private/untrusted_app_27.te#24 droid selinux policy which controls this for SDK <= 28
+
+## mini runbook
+
+Useful commands for working with android, adb, emulators.
+
+uninstall-reinstall:
+
+```sh
+adb uninstall com.viam.rdk.fgservice
+adb install ./path/to/apk
+```
+
+add permissions:
+
+```sh
+for perm in CAMERA RECORD_AUDIO READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE ACCESS_MEDIA_LOCATION; do pm grant com.viam.rdk.fgservice android.permission.$perm; done
+# (remove ACCESS_MEDIA_LOCATION if it complains)
+```
+
+start app from CLI:
+
+```sh
+adb shell am start -n com.viam.rdk.fgservice/.RDKLaunch
+```
+
+To force restart the app (sometimes need to manually start after, see 'start app' above):
+
+```sh
+# need to `su` first
+# ps -A | grep viam
+u0_a54        12743    839 13775572 249856 do_epoll_wait      0 S com.viam.rdk.fgservice
+# kill -9 12743
+```
+
+Find viam's subprocesses (i.e. modules, if running as processes):
+
+```sh
+$ ps -A | grep viam
+u0_a120       6555  1743 6285104 241764 0                   0 S com.viam.rdk.fgservice
+$ ps -A | grep a120
+u0_a120       6555  1743 6285104 241764 0                   0 S com.viam.rdk.fgservice
+u0_a120       6620  6555   11724   7180 0                   0 S sh
+u0_a120       6634  6620 3669544 119780 0                   0 S app_process
+```
