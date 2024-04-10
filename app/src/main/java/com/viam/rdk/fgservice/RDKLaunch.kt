@@ -22,6 +22,7 @@ import dalvik.system.PathClassLoader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.lang.ref.WeakReference
 import java.security.SecureRandom
 import java.util.Timer
 import java.util.TimerTask
@@ -68,9 +69,9 @@ fun maybeStop(ctx: Context) {
     }
 }
 
-class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver() {
+class ModuleStartReceiver(private var applicationContext: Context) : BroadcastReceiver() {
 
-    val threads: MutableMap<String, Thread> = mutableMapOf()
+    private val threads: MutableMap<String, Thread> = mutableMapOf()
 
     companion object {
         val START_ACTION = "com.viam.rdk.fgservice.START_MODULE"
@@ -83,12 +84,12 @@ class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver()
         }
 
         when (intent.action) {
-            ModuleStartReceiver.START_ACTION, ModuleStartReceiver.STOP_ACTION -> {
+            START_ACTION, STOP_ACTION -> {
                 if (intent.extras == null || !intent.extras!!.containsKey("secret")) {
                     Log.e(TAG, "${intent.action} called without secret")
                     return
                 }
-                val intentSecret = intent.getStringExtra("secret");
+                val intentSecret = intent.getStringExtra("secret")
                 if (!intentSecret.equals(moduleSecret)) {
                     Log.e(TAG, "${intent.action} called with incorrect secret")
                     return
@@ -119,79 +120,95 @@ class ModuleStartReceiver(var applicationContext: Context) : BroadcastReceiver()
                 return
             }
 
-            var thread: Thread? = null
-            thread = Thread {
-                var exitCode = 0
-                try {
-                    // this is the loader for the module's jar and its associated libraries
-                    // Note: Shared libraries have not been tested yet; they may interfere with
-                    // this process' own loaded libraries.
-                    // The intent is broadcast from the module's executed shell script and contains:
-                    // secret - moduleSecret that this process creates
-                    // proc_file - the file to write the results (exit code) of the main entry point to
-                    // java_class_path - the class path to search for all classes related to the entry point
-                    // java_library_path - the library path for any libraries we may need (untested)
-                    // java_entry_point_class - the class containing the main function
-                    // java_entry_point_args - the args to invoke with
+            val thread = ModuleThread(
+                WeakReference(applicationContext), WeakReference(threads), intent)
+            threads[entryPointClass] = thread
+            thread.start()
+        }
+    }
 
-                    // todo: we need to test on newer android versions what happens when
-                    //  a shared libraries is loaded, then this module is unloaded and reloaded again.
-                    //  The unloading of shared libraries happens at GC but we don't control that. We may
-                    //  need to try using a finalizer on the ClassLoaders such that we block
-                    //  future attempts to re-load the same module until GC has happened. This may
-                    //  require encouraging GC to happen.
-                    val loader =
-                        PathClassLoader(
-                            intent.getStringExtra("java_class_path"),
-                            intent.getStringExtra("java_library_path"),
-                            ClassLoader.getSystemClassLoader()
-                        );
-                    val fakeCtxCls =
-                        Class.forName("com.viam.sdk.android.module.fake.FakeContext", true, loader)
-                    val fakeCtxAccessibleField = fakeCtxCls.getDeclaredField("accessible")
-                    fakeCtxAccessibleField.isAccessible = true
-                    fakeCtxAccessibleField.set(fakeCtxCls, false)
-                    val modCls = Class.forName("com.viam.sdk.android.module.Module", true, loader)
-                    val parentContextField = modCls.getDeclaredField("parentContext")
-                    parentContextField.isAccessible = true
-                    parentContextField.set(modCls, Supplier {
-                        applicationContext
-                    })
-                    val mainCls =
-                        Class.forName(entryPointClass, true, loader)
-                    val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
-                    try {
-                        // on the shell script side, we combine the args with IFS=\n
-                        mainMethod.invoke(
-                            null,
-                            intent.getStringExtra("java_entry_point_args")!!.split("\n").toTypedArray()
+    class ModuleThread(
+        private var applicationContextRef: WeakReference<Context>,
+        private var threadsRef: WeakReference<MutableMap<String, Thread>>,
+        private var intent: Intent
+    ) : Thread() {
+        override fun run() {
+            var exitCode = 0
+            val entryPointClass = intent.getStringExtra("java_entry_point_class")!!
+            try {
+                // this is the loader for the module's jar and its associated libraries
+                // Note: Shared libraries have not been tested yet; they may interfere with
+                // this process' own loaded libraries.
+                // The intent is broadcast from the module's executed shell script and contains:
+                // secret - moduleSecret that this process creates
+                // proc_file - the file to write the results (exit code) of the main entry point to
+                // java_class_path - the class path to search for all classes related to the entry point
+                // java_library_path - the library path for any libraries we may need (untested)
+                // java_entry_point_class - the class containing the main function
+                // java_entry_point_args - the args to invoke with
+
+                // todo: we need to test on newer android versions what happens when
+                //  a shared libraries is loaded, then this module is unloaded and reloaded again.
+                //  The unloading of shared libraries happens at GC but we don't control that. We may
+                //  need to try using a finalizer on the ClassLoaders such that we block
+                //  future attempts to re-load the same module until GC has happened. This may
+                //  require encouraging GC to happen.
+                val loader =
+                    PathClassLoader(
+                        intent.getStringExtra("java_class_path"),
+                        intent.getStringExtra("java_library_path"),
+                        ClassLoader.getSystemClassLoader()
+                    )
+                val fakeCtxCls =
+                    Class.forName("com.viam.sdk.android.module.fake.FakeContext", true, loader)
+                val fakeCtxAccessibleField = fakeCtxCls.getDeclaredField("accessible")
+                fakeCtxAccessibleField.isAccessible = true
+                fakeCtxAccessibleField.set(fakeCtxCls, false)
+                val modCls = Class.forName("com.viam.sdk.android.module.Module", true, loader)
+                val parentContextField = modCls.getDeclaredField("parentContext")
+                parentContextField.isAccessible = true
+                val appCtx = applicationContextRef.get()
+                if (appCtx == null) {
+                    Log.d(TAG, "application no longer running")
+                    return
+                }
+                parentContextField.set(modCls, Supplier {
+                    appCtx
+                })
+                val mainCls =
+                    Class.forName(entryPointClass, true, loader)
+                val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
+                try {
+                    // on the shell script side, we combine the args with IFS=\n
+                    mainMethod.invoke(
+                        null,
+                        intent.getStringExtra("java_entry_point_args")!!.split("\n").toTypedArray()
+                    )
+                } catch (t: Throwable) {
+                    if (t !is InterruptedException) {
+                        Log.e(
+                            TAG,
+                            "error invoking main for " + intent.getStringExtra("java_entry_point_class"),
+                            t
                         )
-                    } catch (t: Throwable) {
-                        if (t !is InterruptedException) {
-                            Log.e(
-                                TAG,
-                                "error invoking main for " + intent.getStringExtra("java_entry_point_class"),
-                                t
-                            )
-                            exitCode = 1
-                        }
-                    } finally {
-                        File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
+                        exitCode = 1
                     }
                 } finally {
-                    if (exitCode != 0) {
+                    File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
+                }
+            } finally {
+                if (exitCode != 0) {
+                    val threads = threadsRef.get()
+                    if (threads != null) {
                         synchronized (threads) {
                             // check thread equality in case another thread is starting up
-                            if (thread != null && threads.containsKey(entryPointClass) && threads[entryPointClass] == thread!!) {
+                            if (threads.containsKey(entryPointClass) && threads[entryPointClass] == this) {
                                 threads.remove(entryPointClass)
                             }
                         }
                     }
                 }
             }
-
-            threads[entryPointClass] = thread
-            thread.start()
         }
     }
 }
@@ -201,7 +218,7 @@ class RDKLaunch : ComponentActivity(){
     // todo: persist this please
     val confPath = mutableStateOf(defaultConfPath)
     val perms = mutableStateOf(mapOf<String, Boolean>())
-    private lateinit var timer: Timer;
+    private lateinit var timer: Timer
     val bgState = mutableStateOf(RDKStatus.STOPPED)
 
     inner class CheckService() : TimerTask() {
@@ -280,7 +297,7 @@ class RDKLaunch : ComponentActivity(){
     // necessary because we have no other way to clean up the RDK's in-memory state
     // (and we don't want to use a subprocess bc android)
     fun hardRestart() {
-        ProcessPhoenix.triggerRebirth(this);
+        ProcessPhoenix.triggerRebirth(this)
     }
 
     fun setIdKeyConfig(id: String, key: String) {
