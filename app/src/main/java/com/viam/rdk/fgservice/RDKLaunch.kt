@@ -133,7 +133,6 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
         private var intent: Intent
     ) : Thread() {
         override fun run() {
-            var exitCode = 0
             val entryPointClass = intent.getStringExtra("java_entry_point_class")!!
             try {
                 // this is the loader for the module's jar and its associated libraries
@@ -178,6 +177,7 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
                 val mainCls =
                     Class.forName(entryPointClass, true, loader)
                 val mainMethod = mainCls.getDeclaredMethod("main", Array<String>::class.java)
+                var exitCode = 0
                 try {
                     // on the shell script side, we combine the args with IFS=\n
                     mainMethod.invoke(
@@ -197,14 +197,12 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
                     File(intent.getStringExtra("proc_file")).writeText(exitCode.toString())
                 }
             } finally {
-                if (exitCode != 0) {
-                    val threads = threadsRef.get()
-                    if (threads != null) {
-                        synchronized (threads) {
-                            // check thread equality in case another thread is starting up
-                            if (threads.containsKey(entryPointClass) && threads[entryPointClass] == this) {
-                                threads.remove(entryPointClass)
-                            }
+                val threads = threadsRef.get()
+                if (threads != null) {
+                    synchronized (threads) {
+                        // check thread equality in case another thread is starting up
+                        if (threads.containsKey(entryPointClass) && threads[entryPointClass] == this) {
+                            threads.remove(entryPointClass)
                         }
                     }
                 }
