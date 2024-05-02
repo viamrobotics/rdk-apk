@@ -15,6 +15,7 @@ import android.preference.PreferenceManager
 import android.system.Os
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
+import com.jakewharton.processphoenix.ProcessPhoenix
 import droid.Droid.droidStopHook
 import droid.Droid.mainEntry
 import java.io.File
@@ -53,6 +54,7 @@ class RDKThread() : Thread() {
     lateinit var confPath: String
     var waitPerms: Boolean = true
     var status: RDKStatus = RDKStatus.STOPPED
+    var restartAfterStop = true
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -118,6 +120,13 @@ class RDKThread() : Thread() {
             Log.i(TAG, "finished viam thread")
         }
         status = RDKStatus.STOPPED
+        if (restartAfterStop) {
+            // `restartAfterStop` gets set to false when the droid GUI stop button is pressed,
+            // but it's true when RDK stops on its own, probably because of needsRestart feature.
+            // We sleep to keep system load down if this is the bad kind of restart. Todo backoff.
+            sleep(1000)
+            ProcessPhoenix.triggerRebirth(context)
+        }
     }
 }
 
@@ -156,6 +165,7 @@ class RDKForegroundService : Service() {
 
     // trigger RDK stop, destroy this service when done
     fun stopAndDestroy() {
+        thread.restartAfterStop = false
         thread.status = RDKStatus.STOPPING
         droidStopHook()
         if (timer == null) {
