@@ -1,5 +1,14 @@
 # Android APK bundle for RDK
 
+## daily builds
+
+We upload daily builds to GCS, linked below.
+
+You probably want the aarch64 build. If you're running an emulator on an intel device, use x86_64.
+
+- [rdk-apk-latest.aarch64.apk](https://storage.googleapis.com/packages.viam.com/apps/rdk-apk/rdk-apk-latest.aarch64.apk)
+- [rdk-apk-latest.x86_64.apk](https://storage.googleapis.com/packages.viam.com/apps/rdk-apk/rdk-apk-latest.x86_64.apk)
+
 ## instructions
 
 1. install android studio

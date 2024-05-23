@@ -6,6 +6,8 @@ on:
         default: viamrobotics/rdk
       ref:
         default: main
+  schedule:
+  - cron: '0 15 * * 1-5'
 
 jobs:
   daily:
@@ -68,3 +70,45 @@ jobs:
         name: x86 APK
         path: dist/*.x86_64.apk
         if-no-files-found: error
+
+    # next few steps only run on event_name == 'schedule'
+    - name: rename to latest
+      if: github.event_name == 'schedule'
+      working-directory: dist
+      shell: bash
+      run: |
+        for arch in aarch64 x86_64; do
+          mv *.$arch.apk rdk-apk-latest.$arch.apk
+        done
+    - uses: google-github-actions/auth@v2
+      if: github.event_name == 'schedule'
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+    - uses: google-github-actions/upload-cloud-storage@v2
+      if: github.event_name == 'schedule'
+      with:
+        headers: "cache-control: no-cache"
+        path: dist/
+        glob: rdk-apk-latest.*.apk
+        destination: packages.viam.com/apps/rdk-apk
+        parent: false
+    # todo: get a working token and re-enable this
+    # - uses: slackapi/slack-github-action@v1
+    #   # todo: switch to slack integration when https://github.com/integrations/slack/issues/1563 is resolved (only report errors)
+    #   if: github.event_name == 'schedule' && failure()
+    #   with:
+    #     payload: |
+    #       {
+    #         "text": "android daily build failed",
+    #         "blocks": [
+    #           {
+    #             "type": "section",
+    #             "text": {
+    #               "type": "mrkdwn",
+    #               "text": "${{ github.workflow }} [run ${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+    #             }
+    #           }
+    #         ]
+    #       }
+    #   env:
+    #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
