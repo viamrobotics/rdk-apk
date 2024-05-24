@@ -19,7 +19,7 @@ jobs:
         path: rdk-apk
     - uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.repository }}
+        repository: ${{ inputs.repository || 'viamrobotics/rdk' }}
         ref: ${{ inputs.ref }}
         path: rdk
     - name: extract keystore
