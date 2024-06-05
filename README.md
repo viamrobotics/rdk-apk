@@ -1,5 +1,7 @@
 # Android APK bundle for RDK
 
+This is a Kotlin wrapper that makes the [Viam RDK](https://github.com/viamrobotics/rdk) usable on Android systems.
+
 ## daily builds
 
 We upload daily builds to GCS, linked below.
@@ -13,48 +15,43 @@ You probably want the aarch64 build. If you're running an emulator on an intel d
 
 1. install android studio
 2. open this project
-3. in the droid-apk branch of my RDK fork, [here](https://github.com/abe-winter/rdk/tree/droid-apk), run `make droid-rdk.aar`. you may need to install gomobile, you may need to be on go 1.19
+3. in your local RDK checkout, run `make droid-rdk.aar`. you may need to install gomobile (google for instructions).
 4. help this find your RDK. either:
-  - create a symlink /usr/local/src/rdk that points to your rdk
-  - or edit app/build.gradle.kts. change the droid-rdk.aar line to point to the correct path
+  - create a symlink /usr/local/src/rdk that points to your rdk folder.
+  - or edit [app/build.gradle.kts](app/build.gradle.kts). change the droid-rdk.aar line to point to the correct path
 5. hamburger menu -> run -> run
 6. once the app is on your emulator AVD, go to its settings and grant all permissions
 
-## avd setup
+If you run into trouble, check logcat. Some invocations:
 
-### setup with root
+```sh
+# view logs from the RDK golang thread
+adb logcat -d | grep GoLog | less
+
+# view logs for our android package. If something fails to start and `GoLog` doesn't match anything, try this
+adb logcat -d | grep fgservice | less
+```
+
+For module development instructions, look at the [Android example modules README](https://github.com/viamrobotics/viam-java-sdk/tree/main/android/examples/module) in our Java SDK.
+
+## avd notes
+
+Android 12 introduces a background process killer that has to be disabled in device config. Make sure 
+
+### with root access
 
 Root is not strictly required but you may want it so you can write + inspect app private storage. If so:
 
 - in android studio device manager, create a new AVD. Pick an android 10 image for your laptop's architecture (x86 for intel, ARM for apple silicon probably). Make sure to pick one that **doesn't** have google play services. You'll probably have to switch tabs in the UI.
 - run `adb root`, `adb shell`, `su`, `whoami` to make sure you really can get root
 
-### setup without root
+### without root
 
-We're targeting SDK 28 so we can execute downloaded files (see 'termux hack' section below).
-
-To set up local modules, copy binaries into /sdcard/Download like:
-
-```
-adb push binary-name /sdcard/Download
-```
-
-And set up your module to use /sdcard/Download/binary-name as the `executable_path`. Via an ugly and semi-reliable hack, the RDK will then copy from Download to its private cache directory before running.
-
-## termux hack
-
-Nutshell: newer android doesn't want to execute files you download. ([They think](https://developer.android.com/about/versions/10/behavior-changes-10#execute-permission) this is a W^X violation, i.e. nobody other than the package manager should be able to write to a location that is then executed).
-
-We're copying termux, an android shell for linux. They target android sdk 28 to get the old behavior. This means we can't distribute via play store, which we're okay with.
-
-More links:
-- https://viam.atlassian.net/browse/RSDK-6558 for history of the issue for us
-- https://github.com/termux/termux-app/discussions/3372 for summary of termux approach
-- https://android.googlesource.com/platform/system/sepolicy/+/master/private/untrusted_app_27.te#24 droid selinux policy which controls this for SDK <= 28
+Use any AVD image that works on your architecture, ideally with android version less than 12.
 
 ## mini runbook
 
-Useful commands for working with android, adb, emulators.
+Useful commands for working with android, adb, emulators. If a command doesn't start with `adb`, it needs to be run inside an `adb shell` session.
 
 uninstall-reinstall:
 
@@ -95,3 +92,13 @@ u0_a120       6555  1743 6285104 241764 0                   0 S com.viam.rdk.fgs
 u0_a120       6620  6555   11724   7180 0                   0 S sh
 u0_a120       6634  6620 3669544 119780 0                   0 S app_process
 ```
+
+## W^X workaround
+
+Newer android doesn't want to execute files you download. ([They think](https://developer.android.com/about/versions/10/behavior-changes-10#execute-permission) this is a W^X violation, i.e. nobody other than the package manager should be able to write to a location that is then executed).
+
+We target android sdk 28 to get the old behavior.
+
+More links:
+- https://github.com/termux/termux-app/discussions/3372 for summary of termux approach
+- https://android.googlesource.com/platform/system/sepolicy/+/master/private/untrusted_app_27.te#24 droid selinux policy which controls this for SDK <= 28
