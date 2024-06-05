@@ -11,7 +11,14 @@ You probably want the aarch64 build. If you're running an emulator on an intel d
 - [rdk-apk-latest.aarch64.apk](https://storage.googleapis.com/packages.viam.com/apps/rdk-apk/rdk-apk-latest.aarch64.apk)
 - [rdk-apk-latest.x86_64.apk](https://storage.googleapis.com/packages.viam.com/apps/rdk-apk/rdk-apk-latest.x86_64.apk)
 
-## instructions
+App setup after installing:
+1. Use the GUI to load a viam.json file, either from a folder or by pasting in its contents.
+1. In the GUI, there's a card with a list of required permissions. If they're not all checked, add them, either by going to device settings or with the 'add permissions' line in the [runbook](#mini-runbook) below.
+1. Once this is done, your device should show up as live in the Viam webapp. If it doesn't try the logcat lines below to debug.
+
+## developer setup
+
+Use a daily build (see above) if possible, i.e. if you're doing module development. Only build this project if you plan to work on this project.
 
 1. install android studio
 2. open this project
