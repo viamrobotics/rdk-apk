@@ -113,7 +113,8 @@ class RDKThread() : Thread() {
             osEnv["_VIAM_FG_UID"] = Os.getuid().toString()
             osEnv["_VIAM_FG_TEMP_DIR"] = context.cacheDir.path;
             val osEnvStr = osEnv.entries.joinToString(separator = "\n") { "${it.key}=${it.value}" }
-            mainEntry(path.toString(), filesDir.toString(), osEnvStr)
+            val disableMDNS = true // todo: detect droid version
+            mainEntry(path.toString(), filesDir.toString(), osEnvStr, disableMDNS)
         } catch (e: Exception) {
             Log.e(TAG, "viam thread caught error $e")
         } finally {
