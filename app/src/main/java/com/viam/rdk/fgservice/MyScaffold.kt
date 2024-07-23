@@ -160,6 +160,11 @@ fun MyScaffold(activity: RDKLaunch) {
                 }
             }
         }
+        Spacer(Modifier.height(20.dp))
+        Text("Logs will appear below on exit")
+        errorLines.value.forEach {
+            Text(it, color = Color.Red)
+        }
     }
     }
 }

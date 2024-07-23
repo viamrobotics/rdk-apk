@@ -79,12 +79,14 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
     }
 
     override fun onReceive(contxt: Context?, intent: Intent?) {
+        Log.i(TAG, "onReceive TOP")
         if (intent == null) {
             return
         }
 
         when (intent.action) {
             START_ACTION, STOP_ACTION -> {
+                Log.i(TAG, "onReceive intent ${intent.action}")
                 if (intent.extras == null || !intent.extras!!.containsKey("secret")) {
                     Log.e(TAG, "${intent.action} called without secret")
                     return
@@ -102,6 +104,7 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
         }
 
         val entryPointClass = intent.getStringExtra("java_entry_point_class")!!;
+        Log.i(TAG, "onReceive epc $entryPointClass")
 
         synchronized(threads) {
             if (intent.action.equals(STOP_ACTION)) {
@@ -133,7 +136,9 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
         private var intent: Intent
     ) : Thread() {
         override fun run() {
+            Log.i(TAG, "top of ModuleThread.run")
             val entryPointClass = intent.getStringExtra("java_entry_point_class")!!
+            Log.i(TAG, "entryPointClass $entryPointClass")
             try {
                 // this is the loader for the module's jar and its associated libraries
                 // Note: Shared libraries have not been tested yet; they may interfere with
@@ -158,6 +163,7 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
                         intent.getStringExtra("java_library_path"),
                         ClassLoader.getSystemClassLoader()
                     )
+                Log.i(TAG, "java_class_path ${intent.getStringExtra("java_class_path")}, java_library_path ${intent.getStringExtra("java_library_path")}")
                 val fakeCtxCls =
                     Class.forName("com.viam.sdk.android.module.fake.FakeContext", true, loader)
                 val fakeCtxAccessibleField = fakeCtxCls.getDeclaredField("accessible")
@@ -218,6 +224,8 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
         }
     }
 }
+
+val errorLines = mutableStateOf(listOf<String>())
 
 // todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : ComponentActivity(){
