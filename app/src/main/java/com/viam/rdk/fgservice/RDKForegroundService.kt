@@ -7,23 +7,21 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.pm.ServiceInfo
 import android.os.Binder
-import android.os.Environment
 import android.os.IBinder
 import android.preference.PreferenceManager
 import android.system.Os
 import android.util.Log
-import androidx.compose.runtime.mutableStateOf
 import com.jakewharton.processphoenix.ProcessPhoenix
 import droid.Droid.droidStopHook
 import droid.Droid.mainEntry
+import java.io.BufferedInputStream
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.nio.file.StandardWatchEventKinds
-import java.util.EnumSet.copyOf
 import java.util.Timer
 import java.util.TimerTask
-import kotlin.io.path.exists
 
 
 private const val TAG = "RDKForegroundService"
@@ -120,12 +118,57 @@ class RDKThread() : Thread() {
             Log.i(TAG, "finished viam thread")
         }
         status = RDKStatus.STOPPED
+        captureLog()
         if (restartAfterStop) {
             // `restartAfterStop` gets set to false when the droid GUI stop button is pressed,
             // but it's true when RDK stops on its own, probably because of needsRestart feature.
             // We sleep to keep system load down if this is the bad kind of restart. Todo backoff.
             sleep(1000)
             ProcessPhoenix.triggerRebirth(context)
+        }
+    }
+
+    /** read GoLog from logcat to surface RDK errors */
+    fun captureLog() {
+        val bqGoLog = BoundedQueue(50)
+        val bqGoError = BoundedQueue(50)
+        val reader = BufferedReader(
+            InputStreamReader(BufferedInputStream(Runtime.getRuntime().exec("logcat -d GoLog -v process").inputStream)))
+        val logRegex = Regex("^\\w\\(\\s*(\\d+)\\) ([\\d-]+T\\S+)\\s+(\\w+)\\s+(.+)(\\s*.GoLog.\\s*)$")
+        var pid = ""
+        reader.forEachLine {line ->
+            logRegex.find(line)?.let {
+                val (_, newPid, stamp, level, message, _) = it.groupValues
+                if (newPid != pid) {
+                    pid = newPid
+                    bqGoError.deque.clear()
+                    bqGoLog.deque.clear()
+                }
+                val combined = "$stamp $message"
+                if (level == "ERROR") {
+                    bqGoError.add(combined)
+                } else {
+                    bqGoLog.add(combined)
+                }
+            }
+        }
+        Log.i(TAG, "captureLog ${bqGoError.deque.size} errors, ${bqGoLog.deque.size} other")
+        errorLines.value = bqGoError.deque.toList()
+        infoLines.value = bqGoLog.deque.toList()
+    }
+}
+
+// ugh you need to do this to destructure
+operator fun <T> List<T>.component6(): T = get(5)
+
+/** keeps last `size` things added to it */
+class BoundedQueue(val capacity: Int) {
+    val deque = ArrayDeque<String>(capacity)
+
+    fun add(item: String) {
+        deque.add(item)
+        if (deque.size > capacity) {
+            deque.removeFirst()
         }
     }
 }
