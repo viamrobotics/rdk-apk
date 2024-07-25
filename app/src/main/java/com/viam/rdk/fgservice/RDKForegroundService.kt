@@ -53,8 +53,6 @@ class RDKThread() : Thread() {
     var waitPerms: Boolean = true
     var status: RDKStatus = RDKStatus.STOPPED
     var restartAfterStop = true
-    val bqGoLog = BoundedQueue(100)
-    val bqGoError = BoundedQueue(100)
 
     /** wait for necessary permissions to be granted */
     fun permissionLoop() {
@@ -132,20 +130,31 @@ class RDKThread() : Thread() {
 
     /** read GoLog from logcat to surface RDK errors */
     fun captureLog() {
+        val bqGoLog = BoundedQueue(50)
+        val bqGoError = BoundedQueue(50)
         val reader = BufferedReader(
             InputStreamReader(BufferedInputStream(Runtime.getRuntime().exec("logcat -d GoLog").inputStream)))
-        val logRegex = Regex("(\\w+)\\s+GoLog")
+        val logRegex = Regex("^(\\S+ \\S+) \\d+ (\\d+) (\\w) GoLog\\s*:\\s+(.*)")
+        infoStream.clear()
+        errorStream.clear()
         reader.forEachLine {line ->
             logRegex.find(line)?.let {
-                if (it.groupValues[1] == "E") {
-                    bqGoError.add(line)
+                val (_, _, _, level, message) = it.groupValues
+                if (level == "E") {
+                    // note: we don't want trace->"" line because it's the closing bracket
+                    if (errorStream.process(message) == Pair("", "")) {
+                        bqGoError.add(message)
+                    }
                 } else {
-                    bqGoLog.add(line)
+                    if (infoStream.process(message).second == "") {
+                        bqGoLog.add(message)
+                    }
                 }
             }
         }
         Log.i(TAG, "captureLog ${bqGoError.deque.size} errors, ${bqGoLog.deque.size} other")
         errorLines.value = bqGoError.deque.toList()
+        infoLines.value = bqGoLog.deque.toList()
     }
 }
 

@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
@@ -162,8 +163,13 @@ fun MyScaffold(activity: RDKLaunch) {
         }
         Spacer(Modifier.height(20.dp))
         Text("Logs will appear below on exit")
+        Text("Error lines", fontWeight = FontWeight.Bold, color = Color.Red)
         errorLines.value.forEach {
             Text(it, color = Color.Red)
+        }
+        Text("Info lines", fontWeight = FontWeight.Bold)
+        infoLines.value.forEach {
+            Text(it)
         }
     }
     }

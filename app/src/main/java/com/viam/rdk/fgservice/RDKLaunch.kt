@@ -226,6 +226,7 @@ class ModuleStartReceiver(private var applicationContext: Context) : BroadcastRe
 }
 
 val errorLines = mutableStateOf(listOf<String>())
+val infoLines = mutableStateOf(listOf<String>())
 
 // todo: disable lint-baseline.xml entries related to API 28 + fix
 class RDKLaunch : ComponentActivity(){
