@@ -133,22 +133,22 @@ class RDKThread() : Thread() {
         val bqGoLog = BoundedQueue(50)
         val bqGoError = BoundedQueue(50)
         val reader = BufferedReader(
-            InputStreamReader(BufferedInputStream(Runtime.getRuntime().exec("logcat -d GoLog").inputStream)))
-        val logRegex = Regex("^(\\S+ \\S+) \\d+ (\\d+) (\\w) GoLog\\s*:\\s+(.*)")
-        infoStream.clear()
-        errorStream.clear()
+            InputStreamReader(BufferedInputStream(Runtime.getRuntime().exec("logcat -d GoLog -v process").inputStream)))
+        val logRegex = Regex("^\\w\\(\\s*(\\d+)\\) ([\\d-]+T\\S+)\\s+(\\w+)\\s+(.+)(\\s*.GoLog.\\s*)$")
+        var pid = ""
         reader.forEachLine {line ->
             logRegex.find(line)?.let {
-                val (_, _, _, level, message) = it.groupValues
-                if (level == "E") {
-                    // note: we don't want trace->"" line because it's the closing bracket
-                    if (errorStream.process(message) == Pair("", "")) {
-                        bqGoError.add(message)
-                    }
+                val (_, newPid, stamp, level, message, _) = it.groupValues
+                if (newPid != pid) {
+                    pid = newPid
+                    bqGoError.deque.clear()
+                    bqGoLog.deque.clear()
+                }
+                val combined = "$stamp $message"
+                if (level == "ERROR") {
+                    bqGoError.add(combined)
                 } else {
-                    if (infoStream.process(message).second == "") {
-                        bqGoLog.add(message)
-                    }
+                    bqGoLog.add(combined)
                 }
             }
         }
@@ -157,6 +157,9 @@ class RDKThread() : Thread() {
         infoLines.value = bqGoLog.deque.toList()
     }
 }
+
+// ugh you need to do this to destructure
+operator fun <T> List<T>.component6(): T = get(5)
 
 /** keeps last `size` things added to it */
 class BoundedQueue(val capacity: Int) {
