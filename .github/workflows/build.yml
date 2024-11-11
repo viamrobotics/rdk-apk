@@ -24,6 +24,8 @@ jobs:
         repository: ${{ inputs.repository || 'viamrobotics/rdk' }}
         ref: ${{ inputs.ref }}
         path: rdk
+        fetch-depth: 1000 # this is to make `git describe` work
+        fetch-tags: true
     - name: extract keystore
       # we do this so CI builds have consistent signing. otherwise you cannot `adb install` without uninstalling first
       env:
@@ -49,7 +51,7 @@ jobs:
       run: |
         mkdir ../dist
         source $SDKMAN_DIR/bin/sdkman-init.sh
-        export APK_VERSION_SUFFIX=-$(date +%y%m%d)-$(cd ../rdk && git rev-parse --short HEAD)-$(git rev-parse --short HEAD)
+        export APK_VERSION_SUFFIX=-$(date +%y%m%d)-$(cd ../rdk && git describe --tags)-$(git rev-parse --short HEAD)
         # todo(review): is it safe to use gradle in path instead of gradlew? or way to make gradlew use system gradle?
         RDK_PATH=$(realpath ../rdk/droid-rdk.arm64.aar) gradle --no-daemon assembleDebug
         mv app/build/outputs/apk/debug/app-debug.apk \
