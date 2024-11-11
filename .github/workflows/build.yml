@@ -22,6 +22,7 @@ jobs:
         repository: ${{ inputs.repository || 'viamrobotics/rdk' }}
         ref: ${{ inputs.ref }}
         path: rdk
+        fetch-depth: 500 # this is to make `git describe` work
         fetch-tags: true
     - name: git describe
       run: |
