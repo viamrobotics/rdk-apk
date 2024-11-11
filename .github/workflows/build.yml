@@ -12,7 +12,7 @@ on:
 jobs:
   daily:
     runs-on: buildjet-8vcpu-ubuntu-2204
-    container: ghcr.io/${{ github.repository }}
+    # container: ghcr.io/${{ github.repository }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -22,6 +22,7 @@ jobs:
         repository: ${{ inputs.repository || 'viamrobotics/rdk' }}
         ref: ${{ inputs.ref }}
         path: rdk
+        fetch-tags: true
     - name: git describe
       run: |
         cd rdk && git describe --tags
