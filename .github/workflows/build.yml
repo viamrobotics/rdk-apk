@@ -14,6 +14,8 @@ jobs:
     runs-on: buildjet-8vcpu-ubuntu-2204
     container: ghcr.io/${{ github.repository }}
     steps:
+    - name: sentry begin
+      run: curl ${{ secrets.SENTRY_CRONS }}?status=in_progress
     - uses: actions/checkout@v4
       with:
         path: rdk-apk
@@ -89,6 +91,12 @@ jobs:
         glob: rdk-apk-latest.*.apk
         destination: packages.viam.com/apps/rdk-apk
         parent: false
+    - name: sentry ok
+      if: success()
+      run: curl ${{ secrets.SENTRY_CRONS }}?status=ok
+    - name: sentry error
+      if: failure()
+      run: curl ${{ secrets.SENTRY_CRONS }}?status=error
     # todo: get a working token and re-enable this
     # - uses: slackapi/slack-github-action@v1
     #   # todo: switch to slack integration when https://github.com/integrations/slack/issues/1563 is resolved (only report errors)

@@ -7,7 +7,7 @@ RUN --mount=type=cache,target=/var/cache/apt apt-get update
 RUN --mount=type=cache,target=/var/cache/apt apt-get install -qy \
     zip \
     openjdk-21-jdk-headless \
-    make curl patch cmake git python3 wget \
+    make curl patch cmake git python3 wget pkg-config \
     nasm
 
 ENV ANDROID_HOME=/droid
